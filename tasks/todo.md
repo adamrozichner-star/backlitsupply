@@ -1,74 +1,112 @@
-# Backlit Supply — Task List
+# Backlit Supply — Phase 1 Plan
 
-## Phase 0: Setup (MUST COMPLETE BEFORE CODING)
-- [x] Create ~/backlitsupply directory
-- [x] git init (fresh repo, no DPO connection)
-- [ ] Install Node.js (run: `nvm install 20` or `brew install node`)
-- [ ] Run: `npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"`
-- [ ] Run: `npx shadcn@latest init` (dark mode, slate palette)
-- [ ] Create GitHub repo: `gh repo create backlitsupply --public --source=.`
-- [ ] Create NEW Supabase project at supabase.com (name: backlitsupply)
-- [ ] Create `.env.local` with NEW keys (Supabase URL + anon key + service role)
-- [ ] Create NEW Vercel project: `vercel link` → create new → name: backlitsupply
-- [ ] Verify: `pwd` shows ~/backlitsupply, NOT dpo-saas
-- [ ] Verify: git remote does NOT point to dpo-saas repo
-- [ ] Verify: .env.local has DIFFERENT keys from DPO
-- [x] Create tasks/todo.md (this file)
-- [x] Create tasks/lessons.md
-- [x] Create error_log.md
+## Decisions needed from Adam before coding
+1. **Stripe Payment Links** — Do you have placeholder URLs, or should I use `https://buy.stripe.com/PLACEHOLDER_compact` etc.?
+2. **Calendly link** — What's the embed URL for the /contact page? (e.g. `https://calendly.com/adam-backlitsupply/15min`)
+3. **Hero video** — Do you have a video file/URL, or should I build the hero with a dark static background + gradient that's easy to swap in a video later?
+4. **Plausible** — Is the Plausible account set up for backlitsupply.com, or skip analytics script for now?
+5. **Resend** — Is the API key in .env.local? Do you have the sending domain verified, or should I use Resend's test mode?
+6. **Sign images** — Do you have 6-8 sign photos for the gallery/carousel, or should I use dark placeholder cards with "Photo coming soon" that look intentional (not broken)?
 
-## Phase 1: Public Site
-### Routes
-- [ ] `/` — Homepage (hero, process strip, carousel, reviews, lead form, sticky CTA)
-- [ ] `/work` — Gallery page (grid of sign photos with lightbox)
-- [ ] `/process` — How it works (3-step visual + timeline)
-- [ ] `/pricing` — Three tiers (Compact $385, Standard $600, Statement $1200+)
-- [ ] `/contact` — Lead form + Calendly embed
+---
 
-### Components
-- [ ] Layout: Header (nav + logo), Footer (links + social)
-- [ ] Hero section (video bg, rotating taglines, CTA)
-- [ ] ProcessStrip (3-step: Send logo → Mockup → Ship)
-- [ ] MockupCarousel (6-8 sample signs)
-- [ ] ReviewCards (5 Etsy reviews, hardcoded)
-- [ ] LeadForm (name, business, email, logo upload → Supabase + Resend)
-- [ ] StickyMobileCTA (bottom bar on mobile)
-- [ ] PricingCard (tier name, price, features, Stripe link)
+## Build order (7 commits)
 
-### SEO
-- [ ] Meta tags per page (title, description, OG image)
-- [ ] robots.txt + sitemap.xml
-- [ ] JSON-LD LocalBusiness schema on homepage
-- [ ] OG image generation (or static)
+### Commit 1: Layout + theme + fonts
+- [ ] Update `layout.tsx`: dark mode by default (`className="dark"`), Inter font for body, lang="en"
+- [ ] Update `globals.css`: override CSS vars for dark theme — background #0a0a0a, foreground white, accent amber #f59e0b
+- [ ] Create `src/components/Header.tsx`: logo "Backlit Supply", nav links (Work, Process, Pricing, Contact), mobile hamburger
+- [ ] Create `src/components/Footer.tsx`: logo, links, "Custom backlit signs for modern businesses", copyright
+- [ ] Wire Header + Footer into layout.tsx
+- [ ] Metadata: title "Backlit Supply — Custom Backlit Signs for Modern Businesses", description, OG basics
 
-### Integrations
-- [ ] Supabase: leads table (name, business_name, email, logo_url, created_at)
-- [ ] Resend: notification email on lead submit → adam@backlitsupply.com
-- [ ] Stripe Payment Links: placeholder URLs in pricing cards
-- [ ] Plausible analytics script in layout
+### Commit 2: Homepage
+- [ ] Create `src/app/page.tsx` with sections:
+  - Hero: dark bg, headline (tagline #1 default, easy to swap), subheadline, CTA button "Get a free mockup"
+  - Process strip: 3 steps with icons — Send your logo → We mockup → Ship in 10 days
+  - Mockup carousel: 6 placeholder cards (dark bg, amber border, "Coming soon" — swappable)
+  - Reviews: 5 hardcoded Etsy reviews (Lauren, Natalie, Haley, Yarden, Ally — all 5-star)
+  - Lead form: name, business name, email, logo upload (optional), submit button
+  - Final CTA section
+- [ ] Create `src/components/LeadForm.tsx`: form component with server action
+- [ ] Create `src/app/actions.ts`: server action to save lead (console.log for now, Supabase in commit 5)
+- [ ] Create `src/components/StickyMobileCTA.tsx`: fixed bottom bar on mobile only
 
-### Deployment
-- [ ] Push to GitHub
-- [ ] Deploy to Vercel (verify live at vercel URL)
-- [ ] Connect backlitsupply.com domain
-- [ ] Lighthouse audit: target 90+ mobile
+### Commit 3: /work (gallery)
+- [ ] Create `src/app/work/page.tsx`: grid of sign images (placeholders), hover effects, dark bg
+- [ ] Metadata for gallery page
 
-## Phase 2: Personalization Engine
-- [ ] Supabase schema: prospects + page_views tables
-- [ ] `/for/[slug]` dynamic SSR route
-- [ ] Personalized hero with composited mockup image
-- [ ] Stripe link prefilled with business name
-- [ ] View tracking (page_views insert on load)
-- [ ] Graceful 404 for unknown slugs
-- [ ] Hand-craft 1 test page: `/for/test-business`
+### Commit 4: /process + /pricing
+- [ ] Create `src/app/process/page.tsx`: visual timeline — 3 steps expanded with detail
+- [ ] Create `src/app/pricing/page.tsx`: 3 tier cards (Compact $385, Standard $600, Statement $1200+), Stripe link buttons, custom quote CTA
+- [ ] Metadata for both pages
 
-## Phase 3: Scraper + AI Pipeline (DO NOT START until Phase 1+2 live)
-- [ ] scripts/scrape.ts — Google Places API
-- [ ] scripts/mockup.ts — Logo → sign mockup compositing
-- [ ] scripts/seed.ts — Insert prospects to Supabase
-- [ ] scripts/outreach.ts — Claude API for email/DM copy
+### Commit 5: /contact + Supabase + Resend
+- [ ] Create `src/app/contact/page.tsx`: lead form (reuse LeadForm) + Calendly embed placeholder
+- [ ] Create `src/lib/supabase.ts`: server client (uses service role key)
+- [ ] Create Supabase `leads` table — give me the SQL to run:
+  ```sql
+  create table leads (
+    id uuid primary key default gen_random_uuid(),
+    name text not null,
+    business_name text,
+    email text not null,
+    logo_url text,
+    source text default 'website',
+    created_at timestamptz default now()
+  );
+  ```
+- [ ] Update server action: insert lead to Supabase + send Resend email to adam@backlitsupply.com
+- [ ] Wire LeadForm on homepage to the same action
+- [ ] Metadata for contact page
 
-## Phase 4: AI Reply Agent (DO NOT START until Phase 3 generating leads)
-- [ ] Instantly.ai webhook → Claude → draft
-- [ ] Telegram bot for approval
-- [ ] Auto-reply on approval
+### Commit 6: SEO + robots + sitemap
+- [ ] Create `public/robots.txt`
+- [ ] Create `src/app/sitemap.ts` (dynamic sitemap)
+- [ ] Add JSON-LD LocalBusiness schema to homepage
+- [ ] Verify all pages have unique meta title + description
+
+### Commit 7: Polish + push
+- [ ] Mobile responsive check on all pages (375px viewport)
+- [ ] Lighthouse quick check (aim for 90+)
+- [ ] Push to GitHub, trigger Vercel deploy
+- [ ] Test live URL
+
+---
+
+## File tree (planned)
+```
+src/
+  app/
+    layout.tsx          ← dark theme, Inter font, Header+Footer
+    page.tsx            ← Homepage
+    actions.ts          ← Server actions (lead form)
+    sitemap.ts          ← Dynamic sitemap
+    work/page.tsx       ← Gallery
+    process/page.tsx    ← How it works
+    pricing/page.tsx    ← Pricing tiers
+    contact/page.tsx    ← Lead form + Calendly
+    for/[slug]/page.tsx ← Phase 2 (not yet)
+  components/
+    Header.tsx
+    Footer.tsx
+    LeadForm.tsx
+    StickyMobileCTA.tsx
+    ui/button.tsx       ← already exists (shadcn)
+  lib/
+    utils.ts            ← already exists
+    supabase.ts         ← server Supabase client
+public/
+  robots.txt
+```
+
+## Design tokens
+- Background: #0a0a0a (near-black)
+- Foreground: #fafafa (near-white)
+- Accent: #f59e0b (amber — warm LED glow)
+- Accent hover: #d97706
+- Muted: #737373
+- Border: #262626
+- Card: #141414
+- Font body: Inter (or Geist — already in scaffold)
+- Font display: Geist (already in scaffold) — no extra font needed
