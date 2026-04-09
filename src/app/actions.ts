@@ -14,14 +14,15 @@ export async function submitLead(formData: FormData) {
   // Insert into Supabase
   const supabase = getSupabaseServer()
   if (supabase) {
-    const { error } = await supabase.from('leads').insert({
+    const { error } = await supabase.from('prospects').insert({
       name,
       business_name: business_name || null,
       email,
-      source: 'website',
+      source: 'website_lead_form',
+      status: 'new',
     })
     if (error) {
-      console.error('[Lead] Supabase insert failed:', error.message)
+      console.error('[Lead] Supabase insert failed:', error.message, error.details, error.hint)
       return { success: false, error: 'Failed to save. Try again.' }
     }
   } else {
