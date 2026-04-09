@@ -1,11 +1,15 @@
-export const HOMEPAGE_GALLERY = [
+// Full gallery — /work page uses all 7, homepage uses first 6
+export const WORK_GALLERY = [
   { src: '/work/sign-06.webp', category: 'Hospitality', alt: 'Halo-lit storefront sign mounted on architectural facade at night' },
   { src: '/work/sign-07.avif', category: 'Luxury Retail', alt: 'Gold halo-lit metal letters on white marble wall' },
   { src: '/work/sign-01.avif', category: 'Wellness & Medical', alt: 'Halo-lit logo and wordmark on grey wellness studio wall' },
   { src: '/work/sign-02.avif', category: 'Restaurants & Bars', alt: 'Warm halo-lit metal letters on outdoor restaurant wall at dusk' },
   { src: '/work/sign-08.avif', category: 'Hotels & Lobbies', alt: 'Gold halo-lit signature lettering on veined marble lobby wall' },
   { src: '/work/sign-04.avif', category: 'Studios & Concept Spaces', alt: 'Black halo-lit metal letters on raw concrete studio wall' },
+  { src: '/work/sign-03.avif', category: "Restaurants & Caf\u00e9s", alt: 'Warm halo-lit metal letters on veranda restaurant exterior at night' },
 ] as const
+
+export const HOMEPAGE_GALLERY = WORK_GALLERY.slice(0, 6)
 
 export const REAL_REVIEWS = [
   {
@@ -40,7 +44,6 @@ export const REAL_REVIEWS = [
   },
 ] as const
 
-// Display these 4 on homepage (longer quotes from Natalie + Haley add credibility)
 export const HOMEPAGE_REVIEWS = REAL_REVIEWS.filter(r =>
   ['Lauren', 'Natalie', 'Haley', 'Yarden'].includes(r.name)
 )

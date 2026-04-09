@@ -132,7 +132,7 @@ export default function Home() {
       </section>
 
       {/* ── Lead form ───────────────────────────── */}
-      <section className="py-20">
+      <section id="lead-form" className="py-20 scroll-mt-16">
         <div className="mx-auto max-w-md px-5">
           <div className="text-center">
             <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">

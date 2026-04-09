@@ -1,6 +1,7 @@
 'use server'
 
 import { getSupabaseServer } from '@/lib/supabase/server'
+import { getResend } from '@/lib/resend'
 
 export async function submitLead(formData: FormData) {
   const name = formData.get('name') as string
@@ -29,14 +30,31 @@ export async function submitLead(formData: FormData) {
     console.log('[Lead] No Supabase — logging locally:', { name, business_name, email })
   }
 
-  // TODO: Resend notification email to adam@backlitsupply.com
-  // const resend = new Resend(process.env.RESEND_API_KEY)
-  // await resend.emails.send({
-  //   from: 'Backlit Supply <notifications@backlitsupply.com>',
-  //   to: 'adam@backlitsupply.com',
-  //   subject: `New lead: ${business_name || name}`,
-  //   text: `Name: ${name}\nBusiness: ${business_name}\nEmail: ${email}`,
-  // })
+  // Send notification email (best-effort — never fails the form)
+  try {
+    const resend = getResend()
+    const notifyEmail = process.env.LEAD_NOTIFICATION_EMAIL
+    if (resend && notifyEmail) {
+      await resend.emails.send({
+        from: 'Backlit Supply <onboarding@resend.dev>',
+        to: notifyEmail,
+        subject: `New lead: ${business_name || name}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px;">
+            <h2 style="margin-bottom: 16px;">New lead from backlitsupply.com</h2>
+            <p><strong>Name:</strong> ${name}</p>
+            <p><strong>Business:</strong> ${business_name || '(not provided)'}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Submitted:</strong> ${new Date().toISOString()}</p>
+            <hr style="margin: 16px 0; border: none; border-top: 1px solid #e5e5e5;" />
+            <p><a href="mailto:${email}">Reply directly to ${name}</a></p>
+          </div>
+        `,
+      })
+    }
+  } catch (err) {
+    console.error('[Lead] Resend notification failed:', err)
+  }
 
   return { success: true }
 }
