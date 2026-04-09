@@ -43,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={cn('dark h-full', geistSans.variable, geistMono.variable)}>
+    <html lang="en" suppressHydrationWarning className={cn('dark h-full', geistSans.variable, geistMono.variable)}>
       <head>
         {/* Plausible — only loads if domain is configured */}
         {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
