@@ -3,25 +3,10 @@ import HeroBackground from '@/components/HeroBackground'
 import MockupCard from '@/components/MockupCard'
 import LeadForm from '@/components/LeadForm'
 import StickyMobileCTA from '@/components/StickyMobileCTA'
+import { HOMEPAGE_GALLERY, HOMEPAGE_REVIEWS } from '@/lib/gallery'
 import { ArrowRight, Package, Eye, Truck } from '@phosphor-icons/react/dist/ssr'
 
 // ─── Data ───────────────────────────────────────────
-
-const MOCKUPS = [
-  { name: 'Bloom Coffee' },
-  { name: 'Studio Nine' },
-  { name: 'Glow Medspa' },
-  { name: 'Barber & Co' },
-  { name: 'Luna Yoga' },
-  { name: 'Craft Dental' },
-]
-
-const REVIEWS = [
-  { name: 'Lauren', text: 'Absolutely stunning quality. My clients compliment the sign every single day. Worth every penny.' },
-  { name: 'Natalie', text: 'Fast shipping, beautiful craftsmanship. The sign looks even better in person than I imagined.' },
-  { name: 'Haley', text: 'Perfect addition to my salon. The warm glow creates exactly the ambiance I was going for.' },
-  { name: 'Yarden', text: 'Professional communication start to finish. The sign arrived perfectly packaged and looks incredible.' },
-]
 
 const STEPS = [
   { icon: Package, title: 'Send your logo', description: 'Upload your logo or brand assets. We handle the rest.' },
@@ -33,7 +18,7 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <>
+    <div className="pb-20 md:pb-0">
       {/* ── Hero ────────────────────────────────── */}
       <section className="relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-5 py-24">
         <HeroBackground />
@@ -79,7 +64,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Mockup showcase ─────────────────────── */}
+      {/* ── Gallery ─────────────────────────────── */}
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-5">
           <p className="mb-2 text-xs font-medium uppercase tracking-widest text-amber-500">Our work</p>
@@ -89,8 +74,13 @@ export default function Home() {
 
           {/* Horizontal scroll on mobile, grid on desktop */}
           <div className="flex gap-4 overflow-x-auto pb-4 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
-            {MOCKUPS.map((m) => (
-              <MockupCard key={m.name} name={m.name} />
+            {HOMEPAGE_GALLERY.map((item) => (
+              <MockupCard
+                key={item.src}
+                src={item.src}
+                alt={item.alt}
+                category={item.category}
+              />
             ))}
           </div>
 
@@ -110,21 +100,34 @@ export default function Home() {
             What our customers say
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            {REVIEWS.map((r) => (
-              <div key={r.name} className="border border-white/[0.06] bg-[#111] p-6">
+            {HOMEPAGE_REVIEWS.map((r) => (
+              <div key={r.name} className="flex flex-col border border-white/[0.06] bg-[#111] p-6">
                 {/* Stars */}
                 <div className="mb-3 flex gap-0.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
+                  {Array.from({ length: r.rating }).map((_, i) => (
                     <svg key={i} className="size-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
                   ))}
                 </div>
-                <p className="mb-4 text-sm leading-relaxed text-white/60">&ldquo;{r.text}&rdquo;</p>
+                <p className="mb-4 flex-1 text-sm italic leading-relaxed text-white/60">
+                  &ldquo;{r.quote}&rdquo;
+                </p>
                 <p className="text-xs font-medium text-white/80">{r.name}</p>
               </div>
             ))}
           </div>
+          <p className="mt-6 text-center text-xs text-white/30">
+            Verified reviews from our Etsy store{' '}
+            <a
+              href="https://www.etsy.com/shop/KnitAndThreads"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-500/60 transition-colors hover:text-amber-500"
+            >
+              &rarr; KnitAndThreads
+            </a>
+          </p>
         </div>
       </section>
 
@@ -164,10 +167,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Mobile bottom padding for sticky CTA */}
-      <div className="h-16 md:hidden" />
-
       <StickyMobileCTA />
-    </>
+    </div>
   )
 }

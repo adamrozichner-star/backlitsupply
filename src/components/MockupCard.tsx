@@ -1,36 +1,34 @@
 import Image from 'next/image'
 
 interface MockupCardProps {
-  name: string
-  imageUrl?: string
+  src?: string
+  alt?: string
+  category: string
 }
 
-export default function MockupCard({ name, imageUrl }: MockupCardProps) {
+export default function MockupCard({ src, alt, category }: MockupCardProps) {
   return (
-    <div className="group relative flex h-64 w-72 flex-shrink-0 items-center justify-center overflow-hidden border border-white/[0.06] bg-[#111] transition-all hover:border-amber-500/20 sm:h-72 sm:w-80">
-      {imageUrl ? (
+    <div className="group relative aspect-[4/5] w-72 flex-shrink-0 overflow-hidden border border-white/[0.06] bg-[#111] sm:w-auto">
+      {src ? (
         <Image
-          src={imageUrl}
-          alt={`${name} backlit sign`}
+          src={src}
+          alt={alt || `${category} backlit sign`}
           fill
+          sizes="(max-width: 640px) 288px, (max-width: 1024px) 50vw, 33vw"
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
       ) : (
-        <>
-          {/* Placeholder glow */}
+        <div className="flex h-full items-center justify-center">
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="h-20 w-40 rounded-sm bg-amber-500/[0.06] blur-2xl" />
           </div>
-          <div className="relative text-center">
-            <p className="text-lg font-semibold tracking-tight text-white/80">{name}</p>
-            <div className="mx-auto mt-2 h-px w-12 bg-amber-500/40" />
-          </div>
-        </>
+          <p className="relative text-sm text-white/30">Photo coming soon</p>
+        </div>
       )}
 
-      {/* Bottom label */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8">
-        <p className="text-xs font-medium text-white/60">{name}</p>
+      {/* Category label */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10">
+        <p className="text-xs font-medium text-amber-500/80">{category}</p>
       </div>
     </div>
   )

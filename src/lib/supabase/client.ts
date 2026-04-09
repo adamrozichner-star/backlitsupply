@@ -4,12 +4,12 @@ import { createClient } from '@supabase/supabase-js'
 // Guards against missing env vars
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
 export function getSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !supabasePublishableKey) {
     console.warn('[Supabase] Missing env vars — client operations will fail gracefully')
     return null
   }
-  return createClient(supabaseUrl, supabaseAnonKey)
+  return createClient(supabaseUrl, supabasePublishableKey)
 }
