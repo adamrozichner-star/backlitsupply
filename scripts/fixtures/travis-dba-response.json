@@ -1,0 +1,41 @@
+{
+  "_note": "Travis County Clerk assumed name records. Site was unreachable during fixture capture (2026-04-10). This fixture is modeled on the known DBA filing format for Travis County. Replace with real HTML/JSON when the site is accessible.",
+  "records": [
+    {
+      "filing_number": "D-1-GN-24-003421",
+      "assumed_name": "Radiance Aesthetics & Wellness",
+      "owner_name": "Sarah Mitchell",
+      "address": "2401 S Congress Ave, Austin, TX 78704",
+      "filing_date": "2024-08-15",
+      "expiration_date": "2034-08-15",
+      "status": "Active"
+    },
+    {
+      "filing_number": "D-1-GN-24-004012",
+      "assumed_name": "Luxe Skin Studio",
+      "owner_name": "Maria Rodriguez",
+      "address": "1200 W 6th St, Austin, TX 78703",
+      "filing_date": "2024-09-22",
+      "expiration_date": "2034-09-22",
+      "status": "Active"
+    },
+    {
+      "filing_number": "D-1-GN-25-000198",
+      "assumed_name": "Central Texas Laser & Aesthetics",
+      "owner_name": "James Park",
+      "address": "4800 Burnet Rd Ste 230, Austin, TX 78756",
+      "filing_date": "2025-01-10",
+      "expiration_date": "2035-01-10",
+      "status": "Active"
+    },
+    {
+      "filing_number": "D-1-GN-25-001456",
+      "assumed_name": "Drip IV Bar & Med Spa",
+      "owner_name": "Amanda Chen",
+      "address": "3500 Jefferson St Ste 110, Austin, TX 78731",
+      "filing_date": "2025-03-05",
+      "expiration_date": "2035-03-05",
+      "status": "Active"
+    }
+  ]
+}

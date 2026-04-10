@@ -1,0 +1,56 @@
+{
+  "success": true,
+  "data": [
+    {
+      "name": "GLOW MEDSPA, LLC",
+      "taxpayerId": "32074954127",
+      "mailingAddressZip": "76028"
+    },
+    {
+      "name": "GLOW MEDSPA DRIPPING, LLC",
+      "taxpayerId": "32075284870",
+      "mailingAddressZip": "78620"
+    },
+    {
+      "name": "GLOW MEDSPA FRISCO LLC",
+      "taxpayerId": "32080899845",
+      "mailingAddressZip": "77479"
+    },
+    {
+      "name": "MED SPA OF MANSFIELD, INC.",
+      "taxpayerId": "32018603012",
+      "mailingAddressZip": "78738"
+    },
+    {
+      "name": "MED SPA AT SEENA ONE, PLLC",
+      "taxpayerId": "32045156026",
+      "mailingAddressZip": "76028"
+    },
+    {
+      "name": "MED SPA CONSULTANTS LLC",
+      "taxpayerId": "32065353842",
+      "mailingAddressZip": "78613"
+    },
+    {
+      "name": "MED SPA ASSOCIATES, LLC",
+      "taxpayerId": "32070594653",
+      "mailingAddressZip": "77004"
+    },
+    {
+      "name": "MED SPA MD, PLLC",
+      "taxpayerId": "32078230722",
+      "mailingAddressZip": "78676"
+    },
+    {
+      "name": "MED SPAS OF TEXAS, PLLC",
+      "taxpayerId": "32092457897",
+      "mailingAddressZip": "78620"
+    },
+    {
+      "name": "MED SPA STUDIOS, LLC",
+      "taxpayerId": "32095007384",
+      "mailingAddressZip": "75024"
+    }
+  ],
+  "count": 10
+}

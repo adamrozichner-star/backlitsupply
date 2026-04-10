@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# pipeline outputs (generated, not committed)
+scripts/output/
+scripts/templates/
+public/mockups/
+scripts/data/prospect-input.json
