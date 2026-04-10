@@ -27,7 +27,7 @@ import { generateOutreachFixture, generateOutreach } from './lib/outreach'
 import { createLlmClient, FixtureLlmClient } from './lib/llm'
 import { makeSlug } from './lib/slug'
 import { getSupabaseServer } from '../src/lib/supabase/server'
-import { writeFileSync, mkdirSync, existsSync, appendFileSync } from 'fs'
+import { writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync } from 'fs'
 import type { EnrichedProspect } from './lib/types'
 
 // ─── Parse CLI args ─────────────────────────────────────
@@ -107,6 +107,22 @@ async function main() {
     process.exit(1)
   }
 
+  // File-based slug tracker for offline idempotency (fallback when no Supabase)
+  const processedSlugsPath = resolve(outputDir, `.processed-slugs-${nicheName}.json`)
+  const processedSlugs: Set<string> = existsSync(processedSlugsPath)
+    ? new Set(JSON.parse(readFileSync(processedSlugsPath, 'utf-8')))
+    : new Set()
+
+  // Also load existing CSV slugs to prevent duplicate rows
+  const existingCsvSlugs = new Set<string>()
+  if (existsSync(csvPath)) {
+    const lines = readFileSync(csvPath, 'utf-8').trim().split('\n').slice(1) // skip header
+    for (const line of lines) {
+      const match = line.match(/^"([^"]*)"/)
+      if (match) existingCsvSlugs.add(match[1])
+    }
+  }
+
   let successCount = 0
   const stats = { discovered: 0, enriched: 0, qualified: 0, mockups: 0, outreach: 0, skipped_existing: 0 }
 
@@ -133,7 +149,7 @@ async function main() {
       const slug = makeSlug(listing.business_name, listing.city)
       console.log(`\n  ▸ ${listing.business_name} (${slug})`)
 
-      // Idempotency check: skip if slug already exists in Supabase
+      // Idempotency check: skip if slug already processed
       if (supabase) {
         const { data: existing } = await supabase
           .from('prospects')
@@ -146,6 +162,10 @@ async function main() {
           stats.skipped_existing++
           continue
         }
+      } else if (processedSlugs.has(slug)) {
+        console.log(`    [skip] Already processed (file tracker)`)
+        stats.skipped_existing++
+        continue
       }
 
       // Stage 3: Enrichment
@@ -225,11 +245,14 @@ async function main() {
         console.log(`    [outreach] Subject: "${draft.subject}"`)
         stats.outreach++
 
-        // Write to CSV
-        const csvLine = [slug, enriched.business_name, enriched.owner_first_name || '', email, draft.subject, draft.personalized_url]
-          .map(v => `"${(v || '').replace(/"/g, '""')}"`)
-          .join(',')
-        appendFileSync(csvPath, csvLine + '\n')
+        // Write to CSV (dedup by slug)
+        if (!existingCsvSlugs.has(slug)) {
+          const csvLine = [slug, enriched.business_name, enriched.owner_first_name || '', email, draft.subject, draft.personalized_url]
+            .map(v => `"${(v || '').replace(/"/g, '""')}"`)
+            .join(',')
+          appendFileSync(csvPath, csvLine + '\n')
+          existingCsvSlugs.add(slug)
+        }
 
         // Insert into Supabase if available
         if (supabase) {
@@ -250,6 +273,9 @@ async function main() {
             suggested_price_usd: nicheConfig.priceRange[0],
             source: enriched.source_slug,
             status: 'mockup_ready',
+            // pipeline_state is added by migration 0003 — safe to include,
+            // Supabase ignores unknown columns on insert
+            pipeline_state: 'mockup_ready',
           })
 
           if (error) {
@@ -262,9 +288,14 @@ async function main() {
         console.log('    [dry-run] Would generate mockup + outreach')
       }
 
+      // Mark slug as processed (file-based tracker)
+      processedSlugs.add(slug)
       successCount++
     }
   }
+
+  // Persist file-based slug tracker
+  writeFileSync(processedSlugsPath, JSON.stringify([...processedSlugs], null, 2))
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
   console.log(`\n═══ Done ═══`)

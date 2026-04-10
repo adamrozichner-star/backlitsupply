@@ -32,3 +32,9 @@ Corrections and patterns to avoid. Updated after every mistake.
 ## Email reply link text must match the href
 - Email reply link text and link href must both use the customer email field, not the customer name field
 - Easy mistake — name comes first in the form schema, so it's the first variable you reach for
+
+## Travis DBA fixture is synthetic
+- Travis DBA fixture is synthetic — refetch real sample when travis county clerk site returns. TODO date: 2026-04-17.
+
+## Zip-code geo filter is Texas-specific
+- Zip-code geo filter is Texas-specific. Every new niche outside TX needs its own source + geo strategy. Document per-niche in niches/{slug}.ts comments.
