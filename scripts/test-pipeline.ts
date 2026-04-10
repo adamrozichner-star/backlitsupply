@@ -34,9 +34,16 @@ function assert(label: string, condition: boolean, detail?: string) {
 }
 
 function runPipeline(niche: string, limit: number = 5): string {
+  // Run with Supabase env vars blanked so the test uses file-based tracking only.
+  // This ensures the test is offline and idempotent regardless of DB state.
+  // Set to empty string (not delete) to override dotenvx injection.
+  const env = { ...process.env }
+  env.NEXT_PUBLIC_SUPABASE_URL = ''
+  env.SUPABASE_SECRET_KEY = ''
+
   return execSync(
     `npx tsx scripts/run-pipeline.ts --niche=${niche} --source=fixture --limit=${limit}`,
-    { cwd: ROOT, encoding: 'utf-8', timeout: 60000, env: { ...process.env } },
+    { cwd: ROOT, encoding: 'utf-8', timeout: 60000, env },
   )
 }
 
@@ -47,11 +54,13 @@ function cleanOutputs() {
       unlinkSync(resolve(MOCKUP_DIR, f))
     }
   }
-  // Clean CSVs
+  // Clean CSVs and file-based slug trackers
   const dateStr = new Date().toISOString().slice(0, 10)
   for (const niche of ['med-spa', 'restaurants']) {
     const csv = resolve(OUTPUT, `outreach-${niche}-${dateStr}.csv`)
     if (existsSync(csv)) unlinkSync(csv)
+    const tracker = resolve(OUTPUT, `.processed-slugs-${niche}.json`)
+    if (existsSync(tracker)) unlinkSync(tracker)
   }
 }
 

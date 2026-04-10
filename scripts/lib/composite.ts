@@ -26,40 +26,40 @@ export interface TemplateConfig {
 }
 
 export const TEMPLATES: Record<string, TemplateConfig> = {
-  'sign-01': {
-    id: 'sign-01',
-    file: 'sign-01.webp',
-    bbox: { x: 250, y: 150, w: 1100, h: 700 },
+  'wall-01': {
+    id: 'wall-01',
+    file: 'wall-01.webp',
+    bbox: { x: 250, y: 250, w: 1100, h: 400 },
     glowIntensity: 1.0,
   },
-  'sign-02': {
-    id: 'sign-02',
-    file: 'sign-02.webp',
-    bbox: { x: 200, y: 150, w: 1200, h: 700 },
-    glowIntensity: 1.0,
-  },
-  'sign-03': {
-    id: 'sign-03',
-    file: 'sign-03.webp',
-    bbox: { x: 100, y: 300, w: 1400, h: 400 },
-    glowIntensity: 1.2,
-  },
-  'sign-04': {
-    id: 'sign-04',
-    file: 'sign-04.webp',
-    bbox: { x: 100, y: 250, w: 1300, h: 500 },
+  'wall-02': {
+    id: 'wall-02',
+    file: 'wall-02.webp',
+    bbox: { x: 200, y: 280, w: 1200, h: 380 },
     glowIntensity: 1.1,
   },
-  'sign-06': {
-    id: 'sign-06',
-    file: 'sign-06.webp',
-    bbox: { x: 300, y: 200, w: 1000, h: 500 },
-    glowIntensity: 0.9,
+  'wall-03': {
+    id: 'wall-03',
+    file: 'wall-03.webp',
+    bbox: { x: 250, y: 260, w: 1100, h: 400 },
+    glowIntensity: 1.0,
+  },
+  'wall-04': {
+    id: 'wall-04',
+    file: 'wall-04.webp',
+    bbox: { x: 200, y: 250, w: 1200, h: 420 },
+    glowIntensity: 1.2,
+  },
+  'wall-05': {
+    id: 'wall-05',
+    file: 'wall-05.webp',
+    bbox: { x: 300, y: 260, w: 1000, h: 380 },
+    glowIntensity: 1.3,
   },
 }
 
 const TEMPLATES_DIR = resolve(__dirname, '../templates')
-const GLOW_BASE_BLUR = 20
+const GLOW_BASE_BLUR = 50          // high blur for wide LED halo spread
 const AMBER = { r: 245, g: 158, b: 11 }  // #f59e0b
 
 // ─── Logo analysis ──────────────────────────────────────
@@ -209,23 +209,40 @@ export async function compositeMockup(opts: CompositeOptions): Promise<MockupRes
     .ensureAlpha()
     .toBuffer()
 
-  // 4. Generate halo glow layer
-  const glowBlur = Math.round(GLOW_BASE_BLUR * glowIntensity)
-  const glowLayer = await sharp(resizedLogo)
-    .blur(glowBlur)
-    .tint(AMBER)
-    .toBuffer()
+  // 4. Generate amber LED halo glow
+  // Strategy: render an SVG radial gradient in amber, shaped to the logo's
+  // bounding rectangle but expanded outward. This guarantees visible glow
+  // regardless of the logo's alpha channel after blur.
+  const glowSpread = Math.round(70 * glowIntensity)  // px of glow beyond logo edges
+  const glowW = fitW + glowSpread * 2
+  const glowH = fitH + glowSpread * 2
+
+  const glowSvg = `<svg width="${glowW}" height="${glowH}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="g" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+        <stop offset="0%" stop-color="rgb(${AMBER.r},${AMBER.g},${AMBER.b})" stop-opacity="0.85" />
+        <stop offset="40%" stop-color="rgb(${AMBER.r},${AMBER.g},${AMBER.b})" stop-opacity="0.45" />
+        <stop offset="70%" stop-color="rgb(200,130,20)" stop-opacity="0.15" />
+        <stop offset="100%" stop-color="rgb(200,130,20)" stop-opacity="0" />
+      </radialGradient>
+    </defs>
+    <ellipse cx="${glowW / 2}" cy="${glowH / 2}" rx="${glowW / 2}" ry="${glowH / 2}" fill="url(#g)" />
+  </svg>`
+
+  const glowLayer = await sharp(Buffer.from(glowSvg)).png().toBuffer()
 
   // 5. Center logo + glow within bbox
   const offsetX = bbox.x + Math.round((bbox.w - fitW) / 2)
   const offsetY = bbox.y + Math.round((bbox.h - fitH) / 2)
+  const glowOffsetX = offsetX - glowSpread
+  const glowOffsetY = offsetY - glowSpread
 
   // 6. Composite onto template: glow behind, logo on top
   // Skip glow for inverted logos — the residual alpha creates a visible rectangle
   const layers = wasInverted
     ? [{ input: resizedLogo, left: offsetX, top: offsetY, blend: 'over' as const }]
     : [
-        { input: glowLayer, left: offsetX, top: offsetY, blend: 'screen' as const },
+        { input: glowLayer, left: glowOffsetX, top: glowOffsetY, blend: 'screen' as const },
         { input: resizedLogo, left: offsetX, top: offsetY, blend: 'over' as const },
       ]
 

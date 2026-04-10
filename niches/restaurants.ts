@@ -11,7 +11,7 @@ const config: NicheConfig = {
     websiteMustExist: true,
     scoreThreshold: 30,
   },
-  templates: ['sign-03', 'sign-06'],
+  templates: ['wall-03', 'wall-04'],
   copyAngle: 'warm-inviting',
   priceRange: [385, 1200],
   killSwitch: {
