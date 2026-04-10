@@ -47,7 +47,9 @@ export async function submitLead(formData: FormData) {
             <p><strong>Email:</strong> ${email}</p>
             <p><strong>Submitted:</strong> ${new Date().toISOString()}</p>
             <hr style="margin: 16px 0; border: none; border-top: 1px solid #e5e5e5;" />
-            <p><a href="mailto:${email}">Reply directly to ${name}</a></p>
+            <p><strong>Submitted from:</strong> backlitsupply.com lead form</p>
+            <hr style="margin: 16px 0; border: none; border-top: 1px solid #e5e5e5;" />
+            <p><a href="mailto:${email}">Reply directly to ${email}</a></p>
           </div>
         `,
       })

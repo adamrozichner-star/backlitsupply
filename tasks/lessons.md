@@ -18,3 +18,17 @@ Corrections and patterns to avoid. Updated after every mistake.
 - Old: NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 - New: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY
 - All Supabase client code must use the new names
+
+## Verify the last step of any pipeline
+- When testing form→DB→email chains, the only test that matters is whether the human at the end gets the notification
+- "Form submitted successfully" means nothing if no one is alerted
+- Always test end-to-end to the actual inbox
+
+## Resend sandbox sender lands in spam
+- `onboarding@resend.dev` reliably lands in Gmail spam
+- Always verify a custom domain before depending on email notifications for production lead flow
+- Until then, check spam folder and click "Report not spam" to train Gmail
+
+## Email reply link text must match the href
+- Email reply link text and link href must both use the customer email field, not the customer name field
+- Easy mistake — name comes first in the form schema, so it's the first variable you reach for
