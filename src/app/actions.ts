@@ -38,7 +38,7 @@ export async function submitLead(formData: FormData) {
       await resend.emails.send({
         from: 'Backlit Supply <onboarding@resend.dev>',
         to: notifyEmail,
-        subject: `New lead: ${business_name || name}`,
+        subject: `🔔 New lead: ${business_name}`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px;">
             <h2 style="margin-bottom: 16px;">New lead from backlitsupply.com</h2>
