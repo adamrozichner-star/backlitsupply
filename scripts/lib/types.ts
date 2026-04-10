@@ -82,7 +82,7 @@ export interface ProspectEvent {
   prospect_id: string
   event: string
   payload?: Record<string, unknown>
-  ts: string                // ISO timestamp
+  created_at?: string       // ISO timestamp, defaults to now() in DB
 }
 
 // ─── Reply classification ───────────────────────────────

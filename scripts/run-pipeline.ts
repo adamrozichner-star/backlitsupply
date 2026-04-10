@@ -2,7 +2,12 @@
  * Stage 11 — Pipeline orchestrator
  *
  * Runs the full lead generation pipeline for ONE niche.
- * Idempotent on slug, resumable from any state.
+ * Idempotent on slug, resumable from any pipeline_state.
+ *
+ * State machine flow:
+ *   discovered → enriched → qualified → mockup_ready → (sent → opened → replied → ...)
+ *
+ * Each stage checks current state and picks up where it left off.
  *
  * Usage:
  *   npx tsx scripts/run-pipeline.ts --niche=med-spa --geo=austin --source=fixture --limit=5
@@ -21,14 +26,29 @@ import './lib/sources/travis-dba'
 import './lib/sources/fixture'
 import { enrichFromFixture, enrichListing } from './lib/enrich'
 import { qualifyProspect } from './lib/qualify'
-import { compositeMockup, TEMPLATES } from './lib/composite'
+import { compositeMockup } from './lib/composite'
 import { createStorage } from './lib/storage'
 import { generateOutreachFixture, generateOutreach } from './lib/outreach'
 import { createLlmClient, FixtureLlmClient } from './lib/llm'
 import { makeSlug } from './lib/slug'
+import { updatePipelineState, recordEvent } from './lib/metrics'
 import { getSupabaseServer } from '../src/lib/supabase/server'
 import { writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync } from 'fs'
 import type { EnrichedProspect } from './lib/types'
+
+// Pipeline state ordering — used to determine which stages to skip on resume
+const STATE_ORDER = [
+  'discovered', 'enriched', 'qualified', 'mockup_ready',
+  'sent', 'opened', 'replied', 'positive', 'booked', 'won', 'lost', 'dead',
+] as const
+
+function stateIndex(state: string): number {
+  return STATE_ORDER.indexOf(state as typeof STATE_ORDER[number])
+}
+
+function isAtOrPast(currentState: string, targetState: string): boolean {
+  return stateIndex(currentState) >= stateIndex(targetState)
+}
 
 // ─── Parse CLI args ─────────────────────────────────────
 
@@ -44,7 +64,7 @@ function parseArgs() {
 
 const args = parseArgs()
 const nicheName = args.niche
-const sourceOverride = args.source  // 'fixture' to use fixture source
+const sourceOverride = args.source
 const dryRun = args['dry-run'] === 'true'
 const limit = args.limit ? parseInt(args.limit, 10) : Infinity
 const geoFilter = args.geo?.toLowerCase()
@@ -67,7 +87,6 @@ async function main() {
   const isFixture = sourceOverride === 'fixture'
   const useFixtureLlm = isFixture || !process.env.ANTHROPIC_API_KEY
 
-  // Set env for source fixture mode
   if (isFixture) process.env.PIPELINE_SOURCE = 'fixture'
 
   const llm = useFixtureLlm
@@ -113,10 +132,10 @@ async function main() {
     ? new Set(JSON.parse(readFileSync(processedSlugsPath, 'utf-8')))
     : new Set()
 
-  // Also load existing CSV slugs to prevent duplicate rows
+  // Load existing CSV slugs to prevent duplicate rows
   const existingCsvSlugs = new Set<string>()
   if (existsSync(csvPath)) {
-    const lines = readFileSync(csvPath, 'utf-8').trim().split('\n').slice(1) // skip header
+    const lines = readFileSync(csvPath, 'utf-8').trim().split('\n').slice(1)
     for (const line of lines) {
       const match = line.match(/^"([^"]*)"/)
       if (match) existingCsvSlugs.add(match[1])
@@ -124,7 +143,7 @@ async function main() {
   }
 
   let successCount = 0
-  const stats = { discovered: 0, enriched: 0, qualified: 0, mockups: 0, outreach: 0, skipped_existing: 0 }
+  const stats = { discovered: 0, enriched: 0, qualified: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0 }
 
   for (const geo of geos) {
     console.log(`\n── Geo: ${geo.city}, ${geo.state} ──`)
@@ -149,60 +168,145 @@ async function main() {
       const slug = makeSlug(listing.business_name, listing.city)
       console.log(`\n  ▸ ${listing.business_name} (${slug})`)
 
-      // Idempotency check: skip if slug already processed
+      // ── Check existing state (Supabase or file tracker) ──
+      let existingId: string | null = null
+      let currentState: string = 'new'  // 'new' means not yet in DB
+
       if (supabase) {
         const { data: existing } = await supabase
           .from('prospects')
-          .select('id, status')
+          .select('id, pipeline_state')
           .eq('slug', slug)
           .single()
 
         if (existing) {
-          console.log(`    [skip] Already in DB (status: ${existing.status})`)
-          stats.skipped_existing++
-          continue
+          existingId = existing.id
+          currentState = existing.pipeline_state || 'discovered'
+
+          // Already fully processed (mockup_ready or beyond) → skip
+          if (isAtOrPast(currentState, 'mockup_ready')) {
+            console.log(`    [skip] Already at '${currentState}'`)
+            stats.skipped_done++
+            continue
+          }
+
+          console.log(`    [resume] Picking up from '${currentState}'`)
+          stats.resumed++
         }
       } else if (processedSlugs.has(slug)) {
         console.log(`    [skip] Already processed (file tracker)`)
-        stats.skipped_existing++
+        stats.skipped_done++
         continue
       }
 
-      // Stage 3: Enrichment
-      let enriched: EnrichedProspect | null
-      if (isFixture) {
-        enriched = enrichFromFixture(listing)
+      // ── Stage: discovered → enriched ──
+      let enriched: EnrichedProspect | null = null
+
+      if (!isAtOrPast(currentState, 'enriched')) {
+        if (isFixture) {
+          enriched = enrichFromFixture(listing)
+        } else {
+          enriched = await enrichListing(listing, { llm, qualifyConfig: nicheConfig.qualify })
+        }
+
+        if (!enriched) {
+          console.log('    [skip] Enrichment failed')
+          continue
+        }
+
+        // Insert into Supabase as 'discovered' then transition to 'enriched'
+        if (supabase && !existingId) {
+          const { data: inserted, error } = await supabase.from('prospects').insert({
+            slug,
+            business_name: enriched.business_name,
+            owner_first_name: enriched.owner_first_name,
+            owner_last_name: enriched.owner_last_name,
+            email: enriched.email || `contact@${slug}.example.com`,
+            phone: enriched.phone,
+            website: enriched.website,
+            city: enriched.city,
+            state: enriched.state,
+            niche: nicheName,
+            logo_url: enriched.logo_url,
+            source: enriched.source_slug,
+            pipeline_state: 'discovered',
+          }).select('id').single()
+
+          if (error) {
+            console.error(`    [db] Insert failed: ${error.message}`)
+            continue
+          }
+          existingId = inserted!.id
+          await recordEvent(existingId!, 'state:discovered', { source: enriched.source_slug })
+        }
+
+        // Transition: discovered → enriched
+        if (existingId) {
+          await updatePipelineState(existingId, 'enriched', {
+            logo_url: enriched.logo_url,
+            owner: enriched.owner_first_name,
+          })
+          console.log(`    [state] discovered → enriched`)
+        }
       } else {
-        enriched = await enrichListing(listing, { llm, qualifyConfig: nicheConfig.qualify })
+        // Resuming from enriched+ — rebuild enriched from DB
+        if (supabase && existingId) {
+          const { data: row } = await supabase.from('prospects').select('*').eq('id', existingId).single()
+          if (row) {
+            enriched = {
+              business_name: row.business_name,
+              owner_first_name: row.owner_first_name,
+              owner_last_name: row.owner_last_name,
+              email: row.email,
+              phone: row.phone,
+              website: row.website,
+              city: row.city,
+              state: row.state,
+              county: undefined,
+              logo_url: row.logo_url,
+              logo_width: undefined,
+              logo_height: undefined,
+              source_slug: row.source || 'unknown',
+              source_id: undefined,
+            }
+          }
+        }
+        if (!enriched) {
+          console.log('    [skip] Cannot rebuild enrichment data for resume')
+          continue
+        }
       }
 
-      if (!enriched) {
-        console.log('    [skip] Enrichment failed')
-        continue
-      }
       stats.enriched++
 
-      // Stage 4: Qualify
-      const qual = qualifyProspect(enriched, nicheConfig.qualify)
-      console.log(`    [qualify] Score: ${qual.score} (threshold: ${nicheConfig.qualify.scoreThreshold}) → ${qual.passed ? 'PASS' : 'FAIL'}`)
+      // ── Stage: enriched → qualified ──
+      if (!isAtOrPast(currentState, 'qualified')) {
+        const qual = qualifyProspect(enriched, nicheConfig.qualify)
+        console.log(`    [qualify] Score: ${qual.score} (threshold: ${nicheConfig.qualify.scoreThreshold}) → ${qual.passed ? 'PASS' : 'FAIL'}`)
 
-      if (!qual.passed && !isFixture) {
-        console.log('    [skip] Below threshold')
-        continue
+        if (!qual.passed && !isFixture) {
+          console.log('    [skip] Below threshold')
+          // Leave at 'enriched' — don't advance state
+          continue
+        }
+
+        if (existingId) {
+          await updatePipelineState(existingId, 'qualified', { score: qual.score, breakdown: qual.breakdown })
+          console.log(`    [state] enriched → qualified`)
+        }
       }
+
       stats.qualified++
 
-      // Stage 5: Composite mockup
-      const logoPath = isFixture
-        ? resolve(__dirname, 'fixtures/sample-logo-light.png')
-        : enriched.logo_url!
+      // ── Stage: qualified → mockup_ready ──
+      if (!isAtOrPast(currentState, 'mockup_ready') && !dryRun) {
+        const logoPath = isFixture
+          ? resolve(__dirname, 'fixtures/sample-logo-light.png')
+          : enriched.logo_url!
 
-      // For live mode, we'd need to download the logo first
-      // For fixture mode, we use the local file directly
-      const templateId = nicheConfig.templates[successCount % nicheConfig.templates.length]
-      const mockupOutputPath = resolve(mockupDir, `${slug}.webp`)
+        const templateId = nicheConfig.templates[successCount % nicheConfig.templates.length]
+        const mockupOutputPath = resolve(mockupDir, `${slug}.webp`)
 
-      if (!dryRun) {
         try {
           const mockup = await compositeMockup({
             logoPath,
@@ -217,33 +321,38 @@ async function main() {
           continue
         }
 
-        // Stage 6: Upload to storage
+        // Upload to storage
         const mockupUrl = await storage.upload(slug, mockupOutputPath)
         console.log(`    [storage] ${mockupUrl}`)
 
-        // Stage 7: Generate outreach
+        // Update DB with mockup URL + transition state
+        if (supabase && existingId) {
+          await supabase.from('prospects').update({
+            mockup_url: mockupUrl,
+            suggested_dimensions: nicheConfig.priceRange[0] <= 600 ? '24" wide' : '28" wide',
+            suggested_price_usd: nicheConfig.priceRange[0],
+          }).eq('id', existingId)
+
+          await updatePipelineState(existingId, 'mockup_ready', { template: templateId, mockup_url: mockupUrl })
+          console.log(`    [state] qualified → mockup_ready`)
+        }
+
+        // Generate outreach copy
         const email = enriched.email || `contact@${slug}.example.com`
         const draft = isFixture
-          ? generateOutreachFixture({
-              slug,
-              business_name: enriched.business_name,
-              owner_first_name: enriched.owner_first_name,
-              email,
-            })
+          ? generateOutreachFixture({ slug, business_name: enriched.business_name, owner_first_name: enriched.owner_first_name, email })
           : await generateOutreach({
               llm,
               copyAngle: nicheConfig.copyAngle,
-              prospect: {
-                slug,
-                business_name: enriched.business_name,
-                owner_first_name: enriched.owner_first_name,
-                email,
-                city: enriched.city,
-              },
+              prospect: { slug, business_name: enriched.business_name, owner_first_name: enriched.owner_first_name, email, city: enriched.city },
             })
 
         console.log(`    [outreach] Subject: "${draft.subject}"`)
         stats.outreach++
+
+        if (existingId) {
+          await recordEvent(existingId, 'outreach_drafted', { subject: draft.subject })
+        }
 
         // Write to CSV (dedup by slug)
         if (!existingCsvSlugs.has(slug)) {
@@ -253,38 +362,7 @@ async function main() {
           appendFileSync(csvPath, csvLine + '\n')
           existingCsvSlugs.add(slug)
         }
-
-        // Insert into Supabase if available
-        if (supabase) {
-          const { error } = await supabase.from('prospects').insert({
-            slug,
-            business_name: enriched.business_name,
-            owner_first_name: enriched.owner_first_name,
-            owner_last_name: enriched.owner_last_name,
-            email,
-            phone: enriched.phone,
-            website: enriched.website,
-            city: enriched.city,
-            state: enriched.state,
-            niche: nicheName,
-            logo_url: enriched.logo_url,
-            mockup_url: mockupUrl,
-            suggested_dimensions: nicheConfig.priceRange[0] <= 600 ? '24" wide' : '28" wide',
-            suggested_price_usd: nicheConfig.priceRange[0],
-            source: enriched.source_slug,
-            status: 'mockup_ready',
-            // pipeline_state is added by migration 0003 — safe to include,
-            // Supabase ignores unknown columns on insert
-            pipeline_state: 'mockup_ready',
-          })
-
-          if (error) {
-            console.error(`    [db] Insert failed: ${error.message}`)
-          } else {
-            console.log('    [db] Prospect saved')
-          }
-        }
-      } else {
+      } else if (dryRun) {
         console.log('    [dry-run] Would generate mockup + outreach')
       }
 
@@ -305,7 +383,8 @@ async function main() {
   console.log(`  Qualified: ${stats.qualified}`)
   console.log(`  Mockups: ${stats.mockups}`)
   console.log(`  Outreach: ${stats.outreach}`)
-  console.log(`  Skipped (existing): ${stats.skipped_existing}`)
+  console.log(`  Skipped (done): ${stats.skipped_done}`)
+  console.log(`  Resumed: ${stats.resumed}`)
   console.log(`  CSV: ${csvPath}`)
 }
 

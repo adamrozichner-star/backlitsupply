@@ -9,6 +9,36 @@ import { getSupabaseServer } from '../../src/lib/supabase/server'
 import type { ProspectEvent } from './types'
 
 /**
+ * Transition a prospect to a new pipeline state and log the event.
+ * Atomic: updates state + inserts event. Fire-and-forget — never throws.
+ */
+export async function updatePipelineState(
+  prospectId: string,
+  newState: string,
+  payload?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseServer()
+    if (!supabase) return
+
+    // Update state
+    await supabase
+      .from('prospects')
+      .update({ pipeline_state: newState })
+      .eq('id', prospectId)
+
+    // Log event
+    await supabase.from('prospect_events').insert({
+      prospect_id: prospectId,
+      event: `state:${newState}`,
+      payload: payload || {},
+    })
+  } catch (err) {
+    console.error(`[metrics] Failed to update state to "${newState}":`, err)
+  }
+}
+
+/**
  * Record a prospect event. Fire-and-forget — never throws.
  */
 export async function recordEvent(
@@ -24,7 +54,6 @@ export async function recordEvent(
       prospect_id: prospectId,
       event,
       payload: payload || {},
-      ts: new Date().toISOString(),
     })
   } catch (err) {
     console.error(`[metrics] Failed to record event "${event}":`, err)
@@ -63,7 +92,7 @@ export async function getBatchMetrics(
     .eq('prospects.niche', niche)
 
   if (batchDate) {
-    query.gte('ts', batchDate)
+    query.gte('created_at', batchDate)
   }
 
   const { data, error } = await query
