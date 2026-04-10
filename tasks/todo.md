@@ -17,9 +17,20 @@ Live at: https://backlitsupply.com
 
 ---
 
-## Next session: Phase 2 — personalization engine
+## Session 3: Phase 2A — /for/[slug] personalization engine
 
-- [ ] `/for/[slug]` dynamic personalized pages
+### Build order
+1. [ ] Migration SQL (`supabase/migrations/0002_prospects_personalization.sql`) — additive ALTER for prospects + new prospect_page_views table
+2. [ ] TypeScript types (`src/lib/types/prospect.ts`) — Prospect + ProspectPageView
+3. [ ] Data layer (`src/lib/data/prospects.ts`) — getProspectBySlug, recordPageView, seedProspect
+4. [ ] Dynamic page (`src/app/for/[slug]/page.tsx`) — async Server Component, generateMetadata, view tracking
+5. [ ] Page UI (`src/components/ProspectPageView.tsx`) — hero, mockup, specs, CTAs, reviews, FAQ, footer note
+6. [ ] Shared data: extract FAQ to `src/lib/faq.ts` for reuse between /pricing and /for/[slug]
+7. [ ] Admin seed script (`scripts/seed-prospect.ts`) + example JSON + npm script
+8. [ ] Custom 404 (`src/app/not-found.tsx`)
+9. [ ] Build verification + push
+
+### Remaining Phase 2 (future sessions)
 - [ ] Google Places scraper for new businesses
 - [ ] AI mockup pipeline (Claude vision + image generation)
 - [ ] `outreach.ts` (Claude API generates personalized email + DM copy)

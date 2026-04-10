@@ -1,0 +1,22 @@
+{
+  "slug": "glow-medspa-austin",
+  "business_name": "Glow MedSpa",
+  "owner_first_name": "Jessica",
+  "owner_last_name": "Chen",
+  "email": "jessica@glowmedspa.com",
+  "phone": null,
+  "website": "https://glowmedspa.com",
+  "instagram": "@glowmedspa_atx",
+  "city": "Austin",
+  "state": "TX",
+  "country": "US",
+  "niche": "Wellness & Medical",
+  "logo_url": null,
+  "mockup_url": null,
+  "suggested_dimensions": "28\" wide",
+  "suggested_price_usd": 600,
+  "notes": null,
+  "source": "manual",
+  "status": "new",
+  "deal_value": null
+}
