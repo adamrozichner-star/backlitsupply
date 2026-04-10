@@ -26,7 +26,7 @@ import './lib/sources/travis-dba'
 import './lib/sources/fixture'
 import { enrichFromFixture, enrichListing } from './lib/enrich'
 import { qualifyProspect } from './lib/qualify'
-import { compositeMockup } from './lib/composite'
+import { createMockupGenerator } from './lib/mockup-generator'
 import { createStorage } from './lib/storage'
 import { generateOutreachFixture, generateOutreach } from './lib/outreach'
 import { createLlmClient, FixtureLlmClient } from './lib/llm'
@@ -102,6 +102,7 @@ async function main() {
       })
     : createLlmClient()
 
+  const mockupGen = createMockupGenerator()
   const storage = createStorage()
   const supabase = getSupabaseServer()
 
@@ -300,22 +301,34 @@ async function main() {
 
       // ── Stage: qualified → mockup_ready ──
       if (!isAtOrPast(currentState, 'mockup_ready') && !dryRun) {
-        const logoPath = isFixture
-          ? resolve(__dirname, 'fixtures/sample-logo-light.png')
-          : enriched.logo_url!
+        // Load logo buffer
+        let logoBuffer: Buffer
+        if (isFixture) {
+          logoBuffer = readFileSync(resolve(__dirname, 'fixtures/sample-logo-light.png'))
+        } else {
+          // Download logo from URL
+          const logoRes = await fetch(enriched.logo_url!)
+          if (!logoRes.ok) {
+            console.error(`    [mockup] Logo download failed: ${logoRes.status}`)
+            continue
+          }
+          logoBuffer = Buffer.from(await logoRes.arrayBuffer())
+        }
 
-        const templateId = nicheConfig.templates[successCount % nicheConfig.templates.length]
         const mockupOutputPath = resolve(mockupDir, `${slug}.webp`)
 
         try {
-          const mockup = await compositeMockup({
-            logoPath,
-            templateId,
-            outputPath: mockupOutputPath,
-            slug,
-          })
-          console.log(`    [mockup] ${mockup.template_id} → ${mockup.mockup_path}`)
+          const result = await mockupGen.generate(logoBuffer, nicheConfig, slug)
+          writeFileSync(mockupOutputPath, result.buffer)
+          console.log(`    [mockup] ${result.model} → ${mockupOutputPath} ($${result.cost_usd.toFixed(3)})`)
           stats.mockups++
+
+          if (existingId) {
+            await recordEvent(existingId, 'mockup_generated', {
+              model: result.model,
+              cost_usd: result.cost_usd,
+            })
+          }
         } catch (err) {
           console.error(`    [mockup] Failed:`, err)
           continue
@@ -333,7 +346,7 @@ async function main() {
             suggested_price_usd: nicheConfig.priceRange[0],
           }).eq('id', existingId)
 
-          await updatePipelineState(existingId, 'mockup_ready', { template: templateId, mockup_url: mockupUrl })
+          await updatePipelineState(existingId, 'mockup_ready', { mockup_url: mockupUrl })
           console.log(`    [state] qualified → mockup_ready`)
         }
 

@@ -12,6 +12,7 @@ const config: NicheConfig = {
     scoreThreshold: 30,
   },
   templates: ['wall-03', 'wall-04'],
+  mockupPrompt: 'A photorealistic close-up of a restaurant storefront sign. The sign features the provided logo in warm metallic letters with amber LED halo backlighting mounted on a dark wood or brick wall. Inviting warm glow. Evening atmosphere. Shallow depth of field. No other text or signage in the frame.',
   copyAngle: 'warm-inviting',
   priceRange: [385, 1200],
   killSwitch: {

@@ -38,3 +38,9 @@ Corrections and patterns to avoid. Updated after every mistake.
 
 ## Zip-code geo filter is Texas-specific
 - Zip-code geo filter is Texas-specific. Every new niche outside TX needs its own source + geo strategy. Document per-niche in niches/{slug}.ts comments.
+
+## Mockup generation: three approaches tested, decision logged
+- **Batch 1 — single-pass AI (google/gemini-2.5-flash-image)**: Logo as image input, scene described in prompt. Best photorealism (3D depth, per-letter halo, realistic walls). Risk: model substitutes fonts on text-heavy wordmarks. Monograms and icons preserved well. **CHOSEN** — ship this, measure reply rate, optimize later if fidelity complaints arise.
+- **Batch 2 — two-stage (AI scenes + Sharp composite)**: AI generates empty backlit wall scenes, Sharp composites real logo onto them. Pixel-perfect logo fidelity. Problem: logos look flat, no 3D depth, no per-letter halo. Scenes were excellent but compositing couldn't match photorealism. **REJECTED.**
+- **Batch 3 — dual-reference AI (scene + logo as two inputs)**: Sent both a scene image and logo to Gemini. Results similar to batch 1 — model still regenerates letterforms when it wants to. No fidelity improvement over single-pass. Extra complexity for no gain. **REJECTED.**
+- Decision: font substitution on wordmarks is an acceptable tradeoff vs. flat compositing. Most prospects will see their business name rendered as a premium sign — even if the exact font differs slightly, the emotional impact (seeing their brand on a real-looking sign) drives replies. Revisit if reply-rate data shows fidelity matters.
