@@ -14,6 +14,14 @@ import type { RawListing, EnrichedProspect } from './types'
 import type { LlmClient } from './llm'
 import type { QualifyConfig } from '../../niches/types'
 
+/**
+ * Enrichment version — bump this when enrichment logic changes materially.
+ * Pipeline will force-re-enrich any prospect with a lower version on resume.
+ *   v1 = homepage-only, no role evidence gate
+ *   v2 = multi-page crawl + owner role evidence guardrail
+ */
+export const CURRENT_ENRICHMENT_VERSION = 2
+
 // ─── Logo discovery ─────────────────────────────────────
 
 interface LogoCandidate {

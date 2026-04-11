@@ -27,7 +27,7 @@ import './lib/sources/outscraper'
 import './lib/sources/google-places'
 import './lib/sources/fixture'
 import { mergeListings_multi } from './lib/sources/merge'
-import { enrichFromFixture, enrichListing } from './lib/enrich'
+import { enrichFromFixture, enrichListing, CURRENT_ENRICHMENT_VERSION } from './lib/enrich'
 import { qualifyProspect } from './lib/qualify'
 import { createMockupGenerator } from './lib/mockup-generator'
 import { createStorage } from './lib/storage'
@@ -200,13 +200,22 @@ async function main() {
       if (supabase) {
         const { data: existing } = await supabase
           .from('prospects')
-          .select('id, pipeline_state')
+          .select('id, pipeline_state, enrichment_version')
           .eq('slug', slug)
           .single()
 
         if (existing) {
           existingId = existing.id
           currentState = existing.pipeline_state || 'discovered'
+          const existingVersion = existing.enrichment_version ?? 1
+
+          // Check enrichment version — force re-enrich if stale
+          if (isAtOrPast(currentState, 'enriched') && existingVersion < CURRENT_ENRICHMENT_VERSION) {
+            console.log(`    [version] enrichment_version ${existingVersion} < ${CURRENT_ENRICHMENT_VERSION} — resetting to discovered for re-enrichment`)
+            await supabase.from('prospects').update({ pipeline_state: 'discovered' }).eq('id', existingId)
+            await recordEvent(existingId!, 're-enriched_version_bump', { from_version: existingVersion, to_version: CURRENT_ENRICHMENT_VERSION })
+            currentState = 'discovered'
+          }
 
           // Already fully processed (mockup_ready or beyond) → skip
           if (isAtOrPast(currentState, 'mockup_ready')) {
@@ -255,6 +264,7 @@ async function main() {
             logo_url: enriched.logo_url,
             source: enriched.source_slug,
             pipeline_state: 'discovered',
+            enrichment_version: CURRENT_ENRICHMENT_VERSION,
           }).select('id').single()
 
           if (error) {
@@ -267,11 +277,22 @@ async function main() {
 
         // Transition: discovered → enriched
         if (existingId) {
+          // Update prospect fields with enrichment data (also handles re-enrichment)
+          await supabase!.from('prospects').update({
+            owner_first_name: enriched.owner_first_name || null,
+            owner_last_name: enriched.owner_last_name || null,
+            email: enriched.email || null,
+            logo_url: enriched.logo_url || null,
+            website: enriched.website || null,
+            enrichment_version: CURRENT_ENRICHMENT_VERSION,
+          }).eq('id', existingId)
+
           await updatePipelineState(existingId, 'enriched', {
             logo_url: enriched.logo_url,
             owner: enriched.owner_first_name,
+            enrichment_version: CURRENT_ENRICHMENT_VERSION,
           })
-          console.log(`    [state] discovered → enriched`)
+          console.log(`    [state] discovered → enriched (v${CURRENT_ENRICHMENT_VERSION})`)
         }
       } else {
         // Resuming from enriched+ — rebuild enriched from DB
