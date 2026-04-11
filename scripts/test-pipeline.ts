@@ -143,6 +143,20 @@ async function main() {
   assert('normalizeField("David") → "David"', normalizeField('David') === 'David')
   assert('normalizeField(" Jessica ") → "Jessica"', normalizeField(' Jessica ') === 'Jessica')
 
+  // ── Test 6: Owner role evidence gate ───────────────────
+  console.log('\nTest 6: Owner role evidence gate')
+  const { hasValidOwnerRole } = await import('./lib/enrich')
+  assert('hasValidOwnerRole("Jennifer Rushing Founder of Banyan") → true', hasValidOwnerRole('Jennifer Rushing Founder of Banyan'))
+  assert('hasValidOwnerRole("Dr. Winston A. Turnage Founder/Medical Director") → true', hasValidOwnerRole('Dr. Winston A. Turnage Founder/Medical Director'))
+  assert('hasValidOwnerRole("Sang Chin Par, RN-BSN Owner") → true', hasValidOwnerRole('Sang Chin Par, RN-BSN Owner'))
+  assert('hasValidOwnerRole("Diana Carolina Sanchez Co-Founder/Owner") → true', hasValidOwnerRole('Diana Carolina Sanchez Co-Founder/Owner'))
+  assert('hasValidOwnerRole("CEO and Principal") → true', hasValidOwnerRole('CEO and Principal'))
+  // Sarah Wiser case: testimonial context, no role token
+  assert('hasValidOwnerRole("working with Sarah, Makenna professionalism") → false', !hasValidOwnerRole("working with Sarah, Makenna's professionalism"))
+  assert('hasValidOwnerRole(null) → false', !hasValidOwnerRole(null))
+  assert('hasValidOwnerRole("") → false', !hasValidOwnerRole(''))
+  assert('hasValidOwnerRole("Lead Esthetician") → false', !hasValidOwnerRole('Lead Esthetician'))
+
   // ── Summary ───────────────────────────────────────────
   console.log(`\n═══ Results: ${passed} passed, ${failed} failed ═══`)
 

@@ -97,12 +97,13 @@ async function validateLogo(url: string, minSize: number): Promise<{ url: string
 
 const CONTACT_EXTRACT_TOOL = {
   name: 'extract_contact',
-  description: 'Extract owner name and contact email from business website text.',
+  description: 'Extract owner/founder name, their role evidence, and contact email from business website text.',
   input_schema: {
     type: 'object' as const,
     properties: {
       owner_first_name: { type: 'string', description: 'First name of the business owner or founder' },
       owner_last_name: { type: 'string', description: 'Last name of the business owner or founder' },
+      owner_role_evidence: { type: 'string', description: 'Verbatim snippet (max 150 chars) from the source text that proves this person is the owner/founder. Must contain a role title like "founder", "owner", "CEO", "medical director", etc. If no such evidence exists, return null.' },
       contact_email: { type: 'string', description: 'Contact email address' },
     },
     required: ['owner_first_name'],
@@ -112,7 +113,26 @@ const CONTACT_EXTRACT_TOOL = {
 interface ContactInfo {
   owner_first_name?: string
   owner_last_name?: string
+  owner_role_evidence?: string
   contact_email?: string
+}
+
+/**
+ * Validate that owner_role_evidence contains a recognized ownership/leadership token.
+ * If not, the name is likely from a testimonial, staff listing, or other non-ownership context.
+ */
+const OWNER_ROLE_TOKENS = [
+  'founder', 'co-founder', 'cofounder',
+  'owner', 'co-owner', 'coowner',
+  'medical director', 'ceo', 'president', 'principal',
+  'md', 'np', 'rn-bsn', 'proprietor',
+  'chief', 'managing',
+]
+
+export function hasValidOwnerRole(evidence: string | null | undefined): boolean {
+  if (!evidence) return false
+  const lower = evidence.toLowerCase()
+  return OWNER_ROLE_TOKENS.some(token => lower.includes(token))
 }
 
 /**
@@ -213,7 +233,7 @@ async function extractContact(
   baseUrl: string,
   businessName: string,
   llm: LlmClient,
-): Promise<{ contact: ContactInfo; pagesCrawled: string[] }> {
+): Promise<{ contact: ContactInfo; pagesCrawled: string[]; roleValid: boolean }> {
   const startTime = Date.now()
   const pagesCrawled: string[] = [baseUrl]
 
@@ -258,13 +278,24 @@ async function extractContact(
     toolChoice: 'extract_contact',
   })
 
+  const firstName = normalizeField(result.input.owner_first_name) ?? undefined
+  const lastName = normalizeField(result.input.owner_last_name) ?? undefined
+  const roleEvidence = normalizeField(result.input.owner_role_evidence) ?? undefined
+  const email = normalizeField(result.input.contact_email) ?? undefined
+
+  // Validate: owner must have role evidence (founder, owner, CEO, etc.)
+  // This prevents testimonial names, staff mentions, etc. from leaking through
+  const roleValid = hasValidOwnerRole(roleEvidence)
+
   return {
     contact: {
-      owner_first_name: normalizeField(result.input.owner_first_name) ?? undefined,
-      owner_last_name: normalizeField(result.input.owner_last_name) ?? undefined,
-      contact_email: normalizeField(result.input.contact_email) ?? undefined,
+      owner_first_name: roleValid ? firstName : undefined,
+      owner_last_name: roleValid ? lastName : undefined,
+      owner_role_evidence: roleEvidence,
+      contact_email: email,
     },
     pagesCrawled,
+    roleValid,
   }
 }
 
@@ -319,12 +350,14 @@ export async function enrichListing(
 
   // Extract owner + email via LLM (multi-page crawl)
   console.log(`    [enrich] Crawling for owner/email (homepage + subpages)...`)
-  const { contact, pagesCrawled } = await extractContact(html, listing.website, listing.business_name, llm)
+  const { contact, pagesCrawled, roleValid } = await extractContact(html, listing.website, listing.business_name, llm)
   console.log(`    [enrich] Crawled ${pagesCrawled.length} pages: ${pagesCrawled.map(u => { try { return new URL(u).pathname } catch { return u } }).join(', ')}`)
   console.log(`    [enrich] Haiku result: owner=${contact.owner_first_name || '(null)'} ${contact.owner_last_name || ''}, email=${contact.contact_email || '(null)'}`)
+  const roleStatus = roleValid ? 'VALID' : 'REJECTED'
+  console.log(`    [enrich] Role evidence: "${contact.owner_role_evidence || '(none)'}" → ${roleStatus}`)
 
   if (qualifyConfig.requireOwnerName && !contact.owner_first_name) {
-    console.log(`    [enrich] Skip — owner name required but not found`)
+    console.log(`    [enrich] Skip — owner name required but not found (role gate ${roleValid ? 'passed' : 'failed'})`)
     return null
   }
 
