@@ -13,6 +13,7 @@ Live at: https://backlitsupply.com
 - [ ] **Resend domain verification (backlitsupply.com)** — currently using sandbox sender (`onboarding@resend.dev`), emails landing in spam
 - [ ] **Recrop gallery photos to remove visible brand names** — LEGAL, must do before outbound
 - [ ] **Real Stripe Payment Links** — waiting on Adam's pricing decision
+- [ ] **Migrate mockups to Cloudflare R2** — 3 webps committed to git as stopgap. Delete from git once R2 is live.
 - [ ] **Real product photos** — eventually replacing AI-mockup-style supplier reference photos
 
 ---
