@@ -85,23 +85,16 @@ export default function ProspectPageView({ prospect }: { prospect: Prospect }) {
       <section className="py-16">
         <div className="mx-auto max-w-2xl px-5 text-center">
           <a
-            href="https://buy.stripe.com/PLACEHOLDER_custom"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:adam@backlitsupply.com"
             className="inline-flex items-center gap-2 bg-amber-500 px-8 py-4 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
           >
-            Start your order
+            Reply to Adam
             <ArrowRight size={16} weight="bold" />
           </a>
           <p className="mt-4">
-            <a
-              href="https://calendly.com/PLACEHOLDER"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-white/40 underline underline-offset-4 transition-colors hover:text-amber-500"
-            >
-              Or schedule a 15-min call
-            </a>
+            <span className="text-sm text-white/20">
+              WhatsApp &mdash; coming soon
+            </span>
           </p>
         </div>
       </section>
@@ -163,12 +156,10 @@ export default function ProspectPageView({ prospect }: { prospect: Prospect }) {
             Ready to light up {prospect.business_name}?
           </h2>
           <a
-            href="https://buy.stripe.com/PLACEHOLDER_custom"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:adam@backlitsupply.com"
             className="mt-8 inline-flex items-center gap-2 bg-amber-500 px-8 py-4 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
           >
-            Start your order
+            Reply to Adam
             <ArrowRight size={16} weight="bold" />
           </a>
         </div>
