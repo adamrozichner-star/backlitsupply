@@ -128,6 +128,21 @@ async function main() {
   assert('Med spa templates include sign-01', true)  // hardcoded in config
   assert('Restaurants templates include sign-03', true)  // hardcoded in config
 
+  // ── Test 5: Sentinel value normalization ──────────────
+  console.log('\nTest 5: Sentinel value normalization')
+  const { normalizeField } = await import('./lib/enrich')
+  assert('normalizeField("<UNKNOWN>") → null', normalizeField('<UNKNOWN>') === null)
+  assert('normalizeField("N/A") → null', normalizeField('N/A') === null)
+  assert('normalizeField("not found") → null', normalizeField('not found') === null)
+  assert('normalizeField("none") → null', normalizeField('none') === null)
+  assert('normalizeField("null") → null', normalizeField('null') === null)
+  assert('normalizeField("undefined") → null', normalizeField('undefined') === null)
+  assert('normalizeField("") → null', normalizeField('') === null)
+  assert('normalizeField(null) → null', normalizeField(null) === null)
+  assert('normalizeField("  ") → null', normalizeField('  ') === null)
+  assert('normalizeField("David") → "David"', normalizeField('David') === 'David')
+  assert('normalizeField(" Jessica ") → "Jessica"', normalizeField(' Jessica ') === 'Jessica')
+
   // ── Summary ───────────────────────────────────────────
   console.log(`\n═══ Results: ${passed} passed, ${failed} failed ═══`)
 

@@ -88,7 +88,17 @@ async function main() {
   console.log(`  Limit: ${limit === Infinity ? 'none' : limit}`)
 
   const isFixture = sourceOverride === 'fixture'
-  const useFixtureLlm = isFixture || !process.env.ANTHROPIC_API_KEY
+
+  // In production mode (not fixture), ANTHROPIC_API_KEY is required.
+  // Fake owner names from fixture LLM would be catastrophic in real outreach.
+  if (!isFixture && !process.env.ANTHROPIC_API_KEY) {
+    console.error('ERROR: ANTHROPIC_API_KEY is required for live pipeline runs.')
+    console.error('Fixture LLM fallback is only allowed with --source=fixture.')
+    console.error('Set ANTHROPIC_API_KEY in .env.local or use --source=fixture for offline tests.')
+    process.exit(1)
+  }
+
+  const useFixtureLlm = isFixture
 
   if (isFixture) process.env.PIPELINE_SOURCE = 'fixture'
   // Set niche query for Outscraper/Google Places search term
@@ -297,11 +307,16 @@ async function main() {
       // ── Stage: enriched → qualified ──
       if (!isAtOrPast(currentState, 'qualified')) {
         const qual = qualifyProspect(enriched, nicheConfig.qualify)
+
+        if (qual.killed_as_chain) {
+          console.log(`    [qualify] CHAIN KILLED — ${qual.chain_reason}`)
+          continue
+        }
+
         console.log(`    [qualify] Score: ${qual.score} (threshold: ${nicheConfig.qualify.scoreThreshold}) → ${qual.passed ? 'PASS' : 'FAIL'}`)
 
         if (!qual.passed && !isFixture) {
           console.log('    [skip] Below threshold')
-          // Leave at 'enriched' — don't advance state
           continue
         }
 

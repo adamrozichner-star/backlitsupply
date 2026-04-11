@@ -115,6 +115,24 @@ interface ContactInfo {
   contact_email?: string
 }
 
+/**
+ * Normalize sentinel values to null. LLMs sometimes return placeholder strings
+ * like "<UNKNOWN>" or "N/A" instead of null — these must never leak into
+ * prospect data as if they were real names.
+ */
+const SENTINEL_VALUES = new Set([
+  'unknown', '<unknown>', 'n/a', 'na', 'none', 'not found', 'not listed',
+  'null', 'undefined', 'not available', 'not provided', 'n/a', '-',
+])
+
+export function normalizeField(v: string | null | undefined): string | null {
+  if (!v) return null
+  const trimmed = v.trim()
+  if (!trimmed) return null
+  if (SENTINEL_VALUES.has(trimmed.toLowerCase())) return null
+  return trimmed
+}
+
 async function extractContact(
   html: string,
   businessName: string,
@@ -134,13 +152,18 @@ async function extractContact(
     .slice(0, 4000)
 
   const result = await llm.extract<ContactInfo>({
-    system: 'You extract structured contact information from business website text.',
-    prompt: `Extract the owner/founder name and contact email for "${businessName}" from this website text:\n\n${text}`,
+    system: 'You extract structured contact information from business website text. Return null for any field you cannot find — never return placeholder strings like "unknown", "N/A", or "not found".',
+    prompt: `Extract the owner/founder name and contact email for "${businessName}" from this website text. If a field is not present, return null — do NOT guess or use placeholders.\n\n${text}`,
     tools: [CONTACT_EXTRACT_TOOL],
     toolChoice: 'extract_contact',
   })
 
-  return result.input
+  // Normalize sentinel values — convert to undefined for interface compat
+  return {
+    owner_first_name: normalizeField(result.input.owner_first_name) ?? undefined,
+    owner_last_name: normalizeField(result.input.owner_last_name) ?? undefined,
+    contact_email: normalizeField(result.input.contact_email) ?? undefined,
+  }
 }
 
 // ─── Main enrichment ────────────────────────────────────
@@ -157,21 +180,23 @@ export async function enrichListing(
   const { llm, qualifyConfig } = opts
 
   if (!listing.website) {
-    console.log(`  [enrich] Skip ${listing.business_name} — no website`)
+    console.log(`    [enrich] Skip — no website`)
     return null
   }
 
   // Fetch homepage HTML
+  console.log(`    [enrich] Fetching ${listing.website} ...`)
   let html: string
   try {
     const res = await fetch(listing.website, { signal: AbortSignal.timeout(15000) })
     if (!res.ok) {
-      console.log(`  [enrich] Skip ${listing.business_name} — website returned ${res.status}`)
+      console.log(`    [enrich] Skip — website returned ${res.status}`)
       return null
     }
     html = await res.text()
+    console.log(`    [enrich] HTML received: ${(html.length / 1024).toFixed(0)}KB`)
   } catch (err) {
-    console.log(`  [enrich] Skip ${listing.business_name} — website fetch failed: ${err}`)
+    console.log(`    [enrich] Skip — website fetch failed: ${(err as Error).message?.slice(0, 80)}`)
     return null
   }
 
@@ -185,15 +210,18 @@ export async function enrichListing(
   }
 
   if (!logo) {
-    console.log(`  [enrich] Skip ${listing.business_name} — no valid logo found`)
+    console.log(`    [enrich] Skip — no valid logo found (${logoCandidates.length} candidates checked, min ${qualifyConfig.minLogoSize}px)`)
     return null
   }
+  console.log(`    [enrich] Logo found: ${logo.url.slice(0, 80)}... (${logo.width}x${logo.height})`)
 
   // Extract owner + email via LLM
+  console.log(`    [enrich] Calling Haiku for owner/email extraction...`)
   const contact = await extractContact(html, listing.business_name, llm)
+  console.log(`    [enrich] Haiku result: owner=${contact.owner_first_name || '(null)'} ${contact.owner_last_name || ''}, email=${contact.contact_email || '(null)'}`)
 
   if (qualifyConfig.requireOwnerName && !contact.owner_first_name) {
-    console.log(`  [enrich] Skip ${listing.business_name} — no owner name found`)
+    console.log(`    [enrich] Skip — owner name required but not found`)
     return null
   }
 

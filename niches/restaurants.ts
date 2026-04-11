@@ -5,9 +5,12 @@ const config: NicheConfig = {
   displayName: 'Restaurants',
   sources: ['google-places'],
   geos: [{ city: 'Miami', state: 'FL', country: 'US' }],
+  // Status: unsupported — pending better enrichment source.
+  // Miami test (2026-04-11): 0 real owner names, 0 emails from website scraping.
+  // Restaurants don't list owner info on their sites. Revisit after med spas proves out.
   qualify: {
     minLogoSize: 150,
-    requireOwnerName: false,
+    requireOwnerName: true,
     websiteMustExist: true,
     scoreThreshold: 30,
   },
