@@ -406,7 +406,7 @@ export function enrichFromFixture(listing: RawListing): EnrichedProspect {
     business_name: listing.business_name,
     owner_first_name: parts[0] || undefined,
     owner_last_name: parts.slice(1).join(' ') || undefined,
-    email: `contact@${slugify(listing.business_name)}.example.com`,
+    email: undefined,  // fixture mode: no synthesized emails
     phone: listing.phone,
     website: listing.website,
     city: listing.city,

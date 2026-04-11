@@ -39,6 +39,19 @@ import { getSupabaseServer } from '../src/lib/supabase/server'
 import { writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync } from 'fs'
 import type { EnrichedProspect } from './lib/types'
 
+/**
+ * Validate email is real — rejects example.com, empty, and obviously fake addresses.
+ */
+function isValidEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  const trimmed = email.trim().toLowerCase()
+  if (!trimmed) return false
+  if (trimmed.includes('example.com')) return false
+  if (trimmed.includes('example.org')) return false
+  // Basic RFC 5322-ish check: local@domain.tld
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)
+}
+
 // Pipeline state ordering — used to determine which stages to skip on resume
 const STATE_ORDER = [
   'discovered', 'enriched', 'qualified', 'mockup_ready',
@@ -108,7 +121,7 @@ async function main() {
     ? new FixtureLlmClient({
         extract_contact: {
           name: 'extract_contact',
-          input: { owner_first_name: 'Test', owner_last_name: 'Owner', contact_email: 'test@example.com' },
+          input: { owner_first_name: 'Test', owner_last_name: 'Owner', contact_email: null },
         },
         draft_outreach: {
           name: 'draft_outreach',
@@ -130,7 +143,7 @@ async function main() {
   const dateStr = new Date().toISOString().slice(0, 10)
   const csvPath = resolve(outputDir, `outreach-${nicheName}-${dateStr}.csv`)
   if (!existsSync(csvPath)) {
-    writeFileSync(csvPath, 'slug,business_name,owner,email,subject,personalized_url\n')
+    writeFileSync(csvPath, 'slug,business_name,owner,email,subject,body,personalized_url\n')
   }
 
   const geos = geoFilter
@@ -255,7 +268,7 @@ async function main() {
             business_name: enriched.business_name,
             owner_first_name: enriched.owner_first_name,
             owner_last_name: enriched.owner_last_name,
-            email: enriched.email || `contact@${slug}.example.com`,
+            email: enriched.email || null,
             phone: enriched.phone,
             website: enriched.website,
             city: enriched.city,
@@ -400,30 +413,34 @@ async function main() {
           console.log(`    [state] qualified → mockup_ready`)
         }
 
-        // Generate outreach copy
-        const email = enriched.email || `contact@${slug}.example.com`
-        const draft = isFixture
-          ? generateOutreachFixture({ slug, business_name: enriched.business_name, owner_first_name: enriched.owner_first_name, email })
-          : await generateOutreach({
-              llm,
-              copyAngle: nicheConfig.copyAngle,
-              prospect: { slug, business_name: enriched.business_name, owner_first_name: enriched.owner_first_name, email, city: enriched.city },
-            })
+        // Generate outreach copy — only if we have a real email
+        const email = enriched.email
+        if (!email || !isValidEmail(email)) {
+          console.log(`    [outreach] Skipped — no real email (prospect stays at mockup_ready pending manual email discovery)`)
+        } else {
+          const draft = isFixture
+            ? generateOutreachFixture({ slug, business_name: enriched.business_name, owner_first_name: enriched.owner_first_name, email })
+            : await generateOutreach({
+                llm,
+                copyAngle: nicheConfig.copyAngle,
+                prospect: { slug, business_name: enriched.business_name, owner_first_name: enriched.owner_first_name, email, city: enriched.city },
+              })
 
-        console.log(`    [outreach] Subject: "${draft.subject}"`)
-        stats.outreach++
+          console.log(`    [outreach] Subject: "${draft.subject}"`)
+          stats.outreach++
 
-        if (existingId) {
-          await recordEvent(existingId, 'outreach_drafted', { subject: draft.subject })
-        }
+          if (existingId) {
+            await recordEvent(existingId, 'outreach_drafted', { subject: draft.subject })
+          }
 
-        // Write to CSV (dedup by slug)
-        if (!existingCsvSlugs.has(slug)) {
-          const csvLine = [slug, enriched.business_name, enriched.owner_first_name || '', email, draft.subject, draft.personalized_url]
-            .map(v => `"${(v || '').replace(/"/g, '""')}"`)
-            .join(',')
-          appendFileSync(csvPath, csvLine + '\n')
-          existingCsvSlugs.add(slug)
+          // Write to CSV with body (dedup by slug)
+          if (!existingCsvSlugs.has(slug)) {
+            const csvLine = [slug, enriched.business_name, enriched.owner_first_name || '', email, draft.subject, draft.body, draft.personalized_url]
+              .map(v => `"${(v || '').replace(/"/g, '""')}"`)
+              .join(',')
+            appendFileSync(csvPath, csvLine + '\n')
+            existingCsvSlugs.add(slug)
+          }
         }
       } else if (dryRun) {
         console.log('    [dry-run] Would generate mockup + outreach')
