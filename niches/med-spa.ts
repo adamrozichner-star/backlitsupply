@@ -3,7 +3,7 @@ import type { NicheConfig } from './types'
 const config: NicheConfig = {
   slug: 'med-spa',
   displayName: 'Med Spas',
-  sources: ['outscraper', 'comptroller-tx'],
+  sources: ['google-places', 'comptroller-tx'],
   geos: [{ city: 'Austin', state: 'TX', county: 'Travis', country: 'US' }],
   qualify: {
     minLogoSize: 150,

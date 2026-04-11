@@ -3,7 +3,7 @@ import type { NicheConfig } from './types'
 const config: NicheConfig = {
   slug: 'restaurants',
   displayName: 'Restaurants',
-  sources: ['outscraper'],
+  sources: ['google-places'],
   geos: [{ city: 'Miami', state: 'FL', country: 'US' }],
   qualify: {
     minLogoSize: 150,

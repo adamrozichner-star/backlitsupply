@@ -1,10 +1,11 @@
 /**
- * Google Places API (New) — fallback generic discovery source.
+ * Google Places API (New) — primary generic discovery source.
  *
  * Endpoint: POST https://places.googleapis.com/v1/places:searchText
  * Docs: https://developers.google.com/maps/documentation/places/web-service/text-search
  *
- * Used only if Outscraper is unavailable.
+ * $200/month free credit from Google Cloud. Works for any niche, any geo.
+ * Email is not returned — that's enrich.ts's job.
  * Env var: GOOGLE_PLACES_API_KEY
  */
 
@@ -45,6 +46,7 @@ const googlePlaces: BusinessSource = {
       body: JSON.stringify({
         textQuery: `${nicheQuery} in ${location}`,
         maxResultCount: 20,
+        languageCode: 'en',
       }),
       signal: AbortSignal.timeout(15000),
     })
