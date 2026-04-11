@@ -80,6 +80,9 @@ export default function PricingPage() {
             </div>
           ))}
         </div>
+        <p className="mx-auto mt-8 max-w-2xl text-center text-xs leading-relaxed text-white/30">
+          Prices are starting points. Exact quote depends on dimensions, finish, and mounting &mdash; we quote after you send your logo.
+        </p>
       </section>
 
       {/* Custom quote */}
