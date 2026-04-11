@@ -133,36 +133,138 @@ export function normalizeField(v: string | null | undefined): string | null {
   return trimmed
 }
 
+// ─── Multi-page crawling ────────────────────────────────
+
+const OWNER_PAGE_PATTERNS = [
+  /\/team/i, /\/about-us/i, /\/about$/i, /\/our-team/i, /\/meet-the-team/i,
+  /\/providers/i, /\/our-providers/i, /\/staff/i, /\/leadership/i,
+  /\/founder/i, /\/owner/i, /\/physician/i, /\/doctor/i, /\/dr-/i,
+  /\/meet-/i, /\/story/i, /\/who-we-are/i,
+]
+
+const OWNER_LINK_TEXT_PATTERNS = [
+  /team/i, /about/i, /provider/i, /staff/i, /meet/i, /founder/i,
+  /our (team|story|doctors|providers)/i, /who we are/i, /leadership/i,
+]
+
+/** Priority: lower index = fetch first */
+function ownerPagePriority(url: string, text: string): number {
+  const u = url.toLowerCase()
+  const t = text.toLowerCase()
+  if (/team|our-team|meet-the-team|providers|our-providers/.test(u) || /team|provider/.test(t)) return 0
+  if (/about|about-us|who-we-are|story/.test(u) || /about|story/.test(t)) return 1
+  if (/founder|owner|leadership|physician|doctor/.test(u) || /founder|doctor|physician/.test(t)) return 2
+  return 3
+}
+
+function findOwnerPageLinks(html: string, baseUrl: string): { url: string; priority: number }[] {
+  const $ = cheerio.load(html)
+  const found = new Map<string, number>()
+
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href') || ''
+    const text = $(el).text() || ''
+    const resolved = resolveUrl(href, baseUrl)
+
+    // Must be same domain
+    try {
+      const linkHost = new URL(resolved).hostname
+      const baseHost = new URL(baseUrl).hostname.replace(/^www\./, '')
+      if (!linkHost.replace(/^www\./, '').endsWith(baseHost)) return
+    } catch { return }
+
+    const pathMatches = OWNER_PAGE_PATTERNS.some(p => p.test(resolved))
+    const textMatches = OWNER_LINK_TEXT_PATTERNS.some(p => p.test(text))
+
+    if (pathMatches || textMatches) {
+      const priority = ownerPagePriority(resolved, text)
+      const existing = found.get(resolved)
+      if (existing === undefined || priority < existing) {
+        found.set(resolved, priority)
+      }
+    }
+  })
+
+  return [...found.entries()]
+    .map(([url, priority]) => ({ url, priority }))
+    .sort((a, b) => a.priority - b.priority)
+}
+
+async function fetchPageText(url: string, timeoutMs: number): Promise<{ text: string; size: number } | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+    if (!res.ok) return null
+    const html = await res.text()
+    const $ = cheerio.load(html)
+    // Remove script/style noise
+    $('script, style, nav, footer, header').remove()
+    const text = $('body').text().replace(/\s+/g, ' ').trim()
+    return { text, size: html.length }
+  } catch {
+    return null
+  }
+}
+
+const MAX_TEXT_BYTES = 30_000
+const PER_PROSPECT_TIMEOUT_MS = 15_000
+
 async function extractContact(
-  html: string,
+  homepageHtml: string,
+  baseUrl: string,
   businessName: string,
   llm: LlmClient,
-): Promise<ContactInfo> {
-  const $ = cheerio.load(html)
+): Promise<{ contact: ContactInfo; pagesCrawled: string[] }> {
+  const startTime = Date.now()
+  const pagesCrawled: string[] = [baseUrl]
 
-  // Extract text from relevant sections
-  const aboutText = $('*:contains("about")').closest('section, div, main').first().text()
-  const contactText = $('*:contains("contact")').closest('section, div, main').first().text()
-  const bodyText = $('body').text()
+  // Extract homepage body text
+  const $home = cheerio.load(homepageHtml)
+  $home('script, style, nav, footer').remove()
+  let combinedText = $home('body').text().replace(/\s+/g, ' ').trim()
 
-  // Truncate to avoid token overflow
-  const text = [aboutText, contactText, bodyText.slice(0, 2000)]
-    .filter(Boolean)
-    .join('\n\n')
-    .slice(0, 4000)
+  // Find owner-relevant subpage links
+  const ownerLinks = findOwnerPageLinks(homepageHtml, baseUrl)
+  const subpagesToFetch = ownerLinks.slice(0, 3) // top 3 by priority
+
+  if (subpagesToFetch.length > 0) {
+    console.log(`    [enrich] Found ${ownerLinks.length} owner-page links, fetching top ${subpagesToFetch.length}: ${subpagesToFetch.map(l => new URL(l.url).pathname).join(', ')}`)
+  }
+
+  // Fetch subpages (respect per-prospect timeout)
+  for (const link of subpagesToFetch) {
+    const elapsed = Date.now() - startTime
+    const remaining = PER_PROSPECT_TIMEOUT_MS - elapsed
+    if (remaining < 2000) {
+      console.log(`    [enrich] Timeout approaching (${(elapsed / 1000).toFixed(1)}s), skipping remaining subpages`)
+      break
+    }
+
+    const result = await fetchPageText(link.url, Math.min(remaining, 8000))
+    if (result) {
+      pagesCrawled.push(link.url)
+      combinedText += '\n\n--- PAGE: ' + new URL(link.url).pathname + ' ---\n\n' + result.text
+    }
+  }
+
+  // Cap total text at 30KB, truncating the longest parts
+  if (combinedText.length > MAX_TEXT_BYTES) {
+    combinedText = combinedText.slice(0, MAX_TEXT_BYTES)
+  }
 
   const result = await llm.extract<ContactInfo>({
     system: 'You extract structured contact information from business website text. Return null for any field you cannot find — never return placeholder strings like "unknown", "N/A", or "not found".',
-    prompt: `Extract the owner/founder name and contact email for "${businessName}" from this website text. If a field is not present, return null — do NOT guess or use placeholders.\n\n${text}`,
+    prompt: `Extract the owner/founder name and contact email for "${businessName}" from this website text (may include multiple pages). Look for names associated with titles like "owner", "founder", "CEO", "medical director", "lead provider". If a field is not present, return null — do NOT guess or use placeholders.\n\n${combinedText}`,
     tools: [CONTACT_EXTRACT_TOOL],
     toolChoice: 'extract_contact',
   })
 
-  // Normalize sentinel values — convert to undefined for interface compat
   return {
-    owner_first_name: normalizeField(result.input.owner_first_name) ?? undefined,
-    owner_last_name: normalizeField(result.input.owner_last_name) ?? undefined,
-    contact_email: normalizeField(result.input.contact_email) ?? undefined,
+    contact: {
+      owner_first_name: normalizeField(result.input.owner_first_name) ?? undefined,
+      owner_last_name: normalizeField(result.input.owner_last_name) ?? undefined,
+      contact_email: normalizeField(result.input.contact_email) ?? undefined,
+    },
+    pagesCrawled,
   }
 }
 
@@ -215,9 +317,10 @@ export async function enrichListing(
   }
   console.log(`    [enrich] Logo found: ${logo.url.slice(0, 80)}... (${logo.width}x${logo.height})`)
 
-  // Extract owner + email via LLM
-  console.log(`    [enrich] Calling Haiku for owner/email extraction...`)
-  const contact = await extractContact(html, listing.business_name, llm)
+  // Extract owner + email via LLM (multi-page crawl)
+  console.log(`    [enrich] Crawling for owner/email (homepage + subpages)...`)
+  const { contact, pagesCrawled } = await extractContact(html, listing.website, listing.business_name, llm)
+  console.log(`    [enrich] Crawled ${pagesCrawled.length} pages: ${pagesCrawled.map(u => { try { return new URL(u).pathname } catch { return u } }).join(', ')}`)
   console.log(`    [enrich] Haiku result: owner=${contact.owner_first_name || '(null)'} ${contact.owner_last_name || ''}, email=${contact.contact_email || '(null)'}`)
 
   if (qualifyConfig.requireOwnerName && !contact.owner_first_name) {
