@@ -3,8 +3,8 @@ import type { NicheConfig } from './types'
 const config: NicheConfig = {
   slug: 'restaurants',
   displayName: 'Restaurants',
-  sources: ['comptroller-tx'],
-  geos: [{ city: 'Austin', state: 'TX', county: 'Travis' }],
+  sources: ['outscraper'],
+  geos: [{ city: 'Miami', state: 'FL', country: 'US' }],
   qualify: {
     minLogoSize: 150,
     requireOwnerName: false,

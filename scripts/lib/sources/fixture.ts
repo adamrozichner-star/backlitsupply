@@ -88,6 +88,34 @@ const FIXTURE_LISTINGS: RawListing[] = [
     source_slug: 'fixture',
     source_id: 'FIX-008',
   },
+  // Miami fixtures — for restaurants niche testing
+  {
+    business_name: 'Coral Gables Cantina',
+    owner_name: 'Maria Vega',
+    city: 'Miami',
+    state: 'FL',
+    website: 'https://coralgablescantina.example.com',
+    source_slug: 'fixture',
+    source_id: 'FIX-009',
+  },
+  {
+    business_name: 'Brickell Bistro',
+    owner_name: 'James Liu',
+    city: 'Miami',
+    state: 'FL',
+    website: 'https://brickellbistro.example.com',
+    source_slug: 'fixture',
+    source_id: 'FIX-010',
+  },
+  {
+    business_name: 'Wynwood Kitchen & Bar',
+    owner_name: 'Sofia Ramirez',
+    city: 'Miami',
+    state: 'FL',
+    website: 'https://wynwoodkitchen.example.com',
+    source_slug: 'fixture',
+    source_id: 'FIX-011',
+  },
 ]
 
 const fixtureSource: BusinessSource = {

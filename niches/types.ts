@@ -2,6 +2,7 @@ export interface GeoConfig {
   city: string
   state: string
   county?: string
+  country?: string      // ISO code, defaults to 'US'
 }
 
 export interface QualifyConfig {

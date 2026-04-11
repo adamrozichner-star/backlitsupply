@@ -113,11 +113,23 @@ sources: ['your-source'],
 | Variable | Required for |
 |----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SECRET_KEY` | All stages (state persistence) |
+| `OUTSCRAPER_API_KEY` | Primary discovery source (any niche, any geo) |
+| `GOOGLE_PLACES_API_KEY` | Fallback discovery source |
+| `REPLICATE_API_TOKEN` | AI mockup generation (google/gemini-2.5-flash-image) |
 | `ANTHROPIC_API_KEY` | Stages 3, 7, 8 (LLM extraction, outreach, classification) |
 | `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` + `R2_BUCKET_NAME` | Stage 6 R2 storage |
 | `RESEND_API_KEY` + `LEAD_NOTIFICATION_EMAIL` | Email notifications |
 
 Without any env vars, `--source=fixture` mode works fully offline.
+
+### Source priority
+- **outscraper**: Primary. Generic, works for any niche/geo. Requires `OUTSCRAPER_API_KEY`.
+- **comptroller-tx**: TX-only bonus. Franchise tax filings. Auto-skips for non-TX geos. No API key needed.
+- **travis-dba**: Travis County DBA filings. Fixture-only until county clerk site is accessible.
+- **google-places**: Fallback. Requires `GOOGLE_PLACES_API_KEY`.
+- **fixture**: Offline test data. Activated with `--source=fixture`.
+
+When a niche lists multiple sources, the pipeline fetches from each, then merges + deduplicates by normalized name and domain.
 
 ## Directory structure
 

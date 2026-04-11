@@ -23,7 +23,10 @@ import { getNiche } from '../niches'
 import { getSource } from './lib/sources'
 import './lib/sources/comptroller-tx'
 import './lib/sources/travis-dba'
+import './lib/sources/outscraper'
+import './lib/sources/google-places'
 import './lib/sources/fixture'
+import { mergeListings_multi } from './lib/sources/merge'
 import { enrichFromFixture, enrichListing } from './lib/enrich'
 import { qualifyProspect } from './lib/qualify'
 import { createMockupGenerator } from './lib/mockup-generator'
@@ -88,6 +91,8 @@ async function main() {
   const useFixtureLlm = isFixture || !process.env.ANTHROPIC_API_KEY
 
   if (isFixture) process.env.PIPELINE_SOURCE = 'fixture'
+  // Set niche query for Outscraper/Google Places search term
+  process.env.PIPELINE_NICHE_QUERY = nicheConfig.displayName
 
   const llm = useFixtureLlm
     ? new FixtureLlmClient({
@@ -149,17 +154,26 @@ async function main() {
   for (const geo of geos) {
     console.log(`\n── Geo: ${geo.city}, ${geo.state} ──`)
 
-    // Stage 2: Discovery
+    // Stage 2: Discovery — fetch from all configured sources, merge + dedup
     const sourceSlugs = isFixture ? ['fixture'] : nicheConfig.sources
-    const allListings = []
+    const rawListings = []
 
     for (const srcSlug of sourceSlugs) {
-      const source = getSource(srcSlug)
-      console.log(`  [discover] Fetching from ${srcSlug}...`)
-      const listings = await source.fetchNew(geo)
-      console.log(`  [discover] Found ${listings.length} listings from ${srcSlug}`)
-      allListings.push(...listings)
+      try {
+        const source = getSource(srcSlug)
+        console.log(`  [discover] Fetching from ${srcSlug}...`)
+        const listings = await source.fetchNew(geo)
+        console.log(`  [discover] Found ${listings.length} listings from ${srcSlug}`)
+        rawListings.push(...listings)
+      } catch (err) {
+        console.warn(`  [discover] ${srcSlug} failed: ${(err as Error).message?.slice(0, 100)}`)
+        // Continue with other sources — don't let one failure stop the pipeline
+      }
     }
+
+    // Merge and dedup across sources
+    const allListings = rawListings.length > 0 ? mergeListings_multi(rawListings) : []
+    console.log(`  [discover] ${rawListings.length} raw → ${allListings.length} after merge/dedup`)
 
     stats.discovered += allListings.length
 

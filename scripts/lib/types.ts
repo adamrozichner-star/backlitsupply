@@ -28,7 +28,12 @@ export interface RawListing {
   county?: string
   website?: string
   phone?: string
+  email?: string
   filing_date?: string
+  rating?: number           // e.g. 4.8
+  review_count?: number     // e.g. 127
+  latitude?: number
+  longitude?: number
   source_slug: string       // which source plugin found this
   source_id?: string        // unique ID from the source (filing number, etc.)
   raw_data?: Record<string, unknown>  // original parsed fields for debugging

@@ -93,6 +93,12 @@ const comptrollerTx: BusinessSource = {
   slug: 'comptroller-tx',
 
   async fetchNew(geo: GeoConfig, nameRegex?: RegExp): Promise<RawListing[]> {
+    // TX-only source — skip for non-Texas geos
+    if (geo.state !== 'TX' && geo.state !== 'Texas') {
+      console.log(`    [comptroller-tx] Skipping — only available for Texas (got ${geo.state})`)
+      return []
+    }
+
     // Check for fixture mode
     if (process.env.PIPELINE_SOURCE === 'fixture') {
       const fixturePath = resolve(__dirname, '../../fixtures/comptroller-response.json')
