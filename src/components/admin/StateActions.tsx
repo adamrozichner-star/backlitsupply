@@ -63,9 +63,9 @@ export function StateActions({
   const [pending, startTransition] = useTransition()
   const actions = ACTIONS[currentState] || []
 
-  function handleAction(to: PipelineState, label: string) {
+  function handleAction(to: PipelineState, label: string, reason?: string) {
     startTransition(async () => {
-      const result = await updateProspectState(prospectId, to)
+      const result = await updateProspectState(prospectId, to, reason)
       if (result.ok) {
         toast.success(`${label}`, {
           description: `${currentState} → ${to}`,
@@ -74,6 +74,14 @@ export function StateActions({
         toast.error('Update failed', { description: result.error || 'Unknown error' })
       }
     })
+  }
+
+  function handleReset() {
+    const ok = window.confirm(
+      `Reset this prospect from "${currentState}" back to "discovered"?\n\nThis re-opens them to the pipeline. Use only for corrections.`
+    )
+    if (!ok) return
+    handleAction('discovered', 'Reset to Discovered', 'manual_reset')
   }
 
   return (
@@ -105,6 +113,20 @@ export function StateActions({
               {pending ? '...' : action.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Reset — visually separated, confirms before firing.
+          Hidden when already at 'discovered' (no-op). */}
+      {currentState !== 'discovered' && (
+        <div className="mt-5 border-t border-white/[0.04] pt-4">
+          <button
+            onClick={handleReset}
+            disabled={pending}
+            className="text-[10px] uppercase tracking-wider text-white/25 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ↺ Reset to Discovered
+          </button>
         </div>
       )}
     </div>
