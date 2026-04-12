@@ -20,14 +20,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="text-sm font-medium text-white">Backlit Supply</span>
             <span className="text-xs font-medium uppercase tracking-widest text-amber-500">Admin</span>
           </Link>
-          <form action="/api/admin/logout" method="POST">
-            <button
-              type="submit"
+          <nav className="flex items-center gap-4">
+            <Link
+              href="/admin/niches"
               className="text-xs text-white/40 transition-colors hover:text-amber-500"
             >
-              Sign out
-            </button>
-          </form>
+              Niches
+            </Link>
+            <form action="/api/admin/logout" method="POST">
+              <button
+                type="submit"
+                className="text-xs text-white/40 transition-colors hover:text-amber-500"
+              >
+                Sign out
+              </button>
+            </form>
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>

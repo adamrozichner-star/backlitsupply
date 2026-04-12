@@ -8,11 +8,18 @@ import { ProspectTable } from '@/components/admin/ProspectTable'
 import { CostChart } from '@/components/admin/CostChart'
 import { ActivityFeed } from '@/components/admin/ActivityFeed'
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ niche?: string }>
+}) {
+  const sp = await searchParams
+  const nicheFilter = sp.niche
+
   const [metrics, funnel, prospects, costs, events, niches] = await Promise.all([
     getMetricsTotals(),
     getFunnelCounts(),
-    getProspects(),
+    getProspects(nicheFilter ? { niche: nicheFilter } : {}),
     getCostBreakdown(8),
     getRecentEvents(20),
     getNiches(),
@@ -53,7 +60,7 @@ export default async function AdminDashboard() {
 
       {/* Prospect table */}
       <section>
-        <ProspectTable prospects={prospects} niches={niches} />
+        <ProspectTable prospects={prospects} niches={niches} initialNiche={nicheFilter} />
       </section>
 
       {/* Recent activity */}

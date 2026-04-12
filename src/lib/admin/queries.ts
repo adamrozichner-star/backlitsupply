@@ -68,6 +68,24 @@ export interface CostBreakdownWeek {
   replicate: number
 }
 
+export interface NicheMetrics {
+  niche: string
+  total: number
+  discovered: number
+  enriched: number
+  qualified: number
+  mockup_ready: number
+  sent: number
+  opened: number
+  replied: number
+  positive: number
+  booked: number
+  won: number
+  lost: number
+  sendable: number             // has owner_first_name AND email
+  mockup_hit_rate: number      // mockup_ready / qualified (0-1)
+}
+
 // ─── Funnel ─────────────────────────────────────────────
 
 export async function getFunnelCounts(): Promise<FunnelCounts[]> {
@@ -311,6 +329,64 @@ export async function getRecentEvents(limit = 20): Promise<AdminEvent[]> {
 }
 
 // ─── Niche list for filter dropdown ─────────────────────
+
+// ─── Per-niche metrics (for /admin/niches comparative view) ────────────
+
+export async function getMetricsByNiche(): Promise<NicheMetrics[]> {
+  const sb = getSupabaseServer()
+  if (!sb) return []
+
+  // Single query, groupable client-side — Supabase doesn't do GROUP BY via PostgREST,
+  // so we pull the minimal columns and bucket in JS. Still one round-trip.
+  const { data } = await sb
+    .from('prospects')
+    .select('niche, pipeline_state, owner_first_name, email')
+    .not('niche', 'is', null)
+
+  if (!data) return []
+
+  const byNiche = new Map<string, NicheMetrics>()
+
+  function ensure(niche: string): NicheMetrics {
+    let m = byNiche.get(niche)
+    if (!m) {
+      m = {
+        niche,
+        total: 0,
+        discovered: 0, enriched: 0, qualified: 0, mockup_ready: 0,
+        sent: 0, opened: 0, replied: 0, positive: 0, booked: 0, won: 0, lost: 0,
+        sendable: 0,
+        mockup_hit_rate: 0,
+      }
+      byNiche.set(niche, m)
+    }
+    return m
+  }
+
+  for (const row of data) {
+    const niche = row.niche as string
+    const state = row.pipeline_state as PipelineState | null
+    const m = ensure(niche)
+    m.total++
+
+    if (state && state in m) {
+      // @ts-expect-error dynamic field access is safe here
+      m[state]++
+    }
+
+    if (row.owner_first_name && row.email) m.sendable++
+  }
+
+  // Compute hit rate: mockup_ready+ / (qualified + mockup_ready+)
+  // (prospects that reached the mockup stage, out of those that got past qualify)
+  for (const m of byNiche.values()) {
+    const reachedMockup = m.mockup_ready + m.sent + m.opened + m.replied + m.positive + m.booked + m.won
+    const pastQualify = m.qualified + reachedMockup + m.lost
+    m.mockup_hit_rate = pastQualify > 0 ? reachedMockup / pastQualify : 0
+  }
+
+  return [...byNiche.values()].sort((a, b) => b.total - a.total)
+}
 
 export async function getNiches(): Promise<string[]> {
   const sb = getSupabaseServer()

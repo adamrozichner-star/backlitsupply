@@ -9,14 +9,15 @@ import { StateBadge } from './StateBadge'
 interface Props {
   prospects: AdminProspect[]
   niches: string[]
+  initialNiche?: string
 }
 
 type SortKey = 'business_name' | 'owner' | 'niche' | 'geo' | 'state' | 'days' | 'score'
 
-export function ProspectTable({ prospects, niches }: Props) {
+export function ProspectTable({ prospects, niches, initialNiche }: Props) {
   const [search, setSearch] = useState('')
   const [stateFilter, setStateFilter] = useState<PipelineState | 'all'>('all')
-  const [nicheFilter, setNicheFilter] = useState<string>('all')
+  const [nicheFilter, setNicheFilter] = useState<string>(initialNiche && niches.includes(initialNiche) ? initialNiche : 'all')
   const [sortKey, setSortKey] = useState<SortKey>('days')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
