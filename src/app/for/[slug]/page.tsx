@@ -30,9 +30,24 @@ export default async function ProspectPage({ params }: Props) {
 
   if (!prospect) notFound()
 
-  // Fire-and-forget view tracking
+  // Fire-and-forget view tracking (legacy — raw prospect_page_views table)
   const hdrs = await headers()
   recordPageView(prospect.id, hdrs.get('user-agent'), hdrs.get('referer'))
 
-  return <ProspectPageView prospect={prospect} />
+  return (
+    <>
+      <ProspectPageView prospect={prospect} />
+      {/* Tracking pixel — writes page_visited event, auto-transitions sent→opened.
+          1h cookie dedupe, bot-filtered server-side. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/api/track/visit?slug=${encodeURIComponent(slug)}`}
+        width="1"
+        height="1"
+        alt=""
+        aria-hidden="true"
+        style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }}
+      />
+    </>
+  )
 }

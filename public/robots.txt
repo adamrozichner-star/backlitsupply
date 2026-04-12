@@ -3,5 +3,6 @@ Allow: /
 
 Disallow: /admin
 Disallow: /api/
+Disallow: /api/track
 
 Sitemap: https://backlitsupply.com/sitemap.xml
