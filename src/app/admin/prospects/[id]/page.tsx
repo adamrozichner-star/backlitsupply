@@ -5,6 +5,7 @@ import { getProspectDetail, type PipelineState } from '@/lib/admin/queries'
 import { StateBadge } from '@/components/admin/StateBadge'
 import { EventTimeline } from '@/components/admin/EventTimeline'
 import { StateActions } from '@/components/admin/StateActions'
+import { NoteForm } from '@/components/admin/NoteForm'
 import { ArrowLeft, ArrowSquareOut } from '@phosphor-icons/react/dist/ssr'
 
 export default async function ProspectDetailPage({
@@ -127,7 +128,7 @@ export default async function ProspectDetailPage({
           )}
         </div>
 
-        {/* Right col — state actions + timeline */}
+        {/* Right col — state actions + timeline + note form */}
         <div className="space-y-4">
           {prospect.pipeline_state && (
             <StateActions
@@ -137,6 +138,7 @@ export default async function ProspectDetailPage({
             />
           )}
           <EventTimeline events={events} />
+          <NoteForm prospectId={prospect.id} />
         </div>
       </div>
     </div>
