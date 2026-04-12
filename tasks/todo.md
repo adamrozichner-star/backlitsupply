@@ -115,3 +115,71 @@ Config-driven, fully-resumable pipeline. Med spas in Austin is the first config 
 - [ ] AI reply agent (Phase 4)
 - [ ] R2 live storage
 - [ ] Kill switch auto-tune based on metrics
+
+---
+
+## Phase 5: Admin Dashboard
+
+Read-only, password-protected `/admin` route. Live Supabase reads, no caching.
+Mobile-first. Single user (Adam). Same dark/amber theme as marketing site.
+
+### Step 1 — Auth + middleware
+- [ ] Add `ADMIN_PASSWORD` + `ADMIN_SESSION_SECRET` to `.env.example`
+- [ ] Install `jose` for JWT signing (edge-compatible)
+- [ ] `src/lib/admin/auth.ts` — signSession, verifySession, getSessionFromCookies
+- [ ] `src/middleware.ts` — protect `/admin/*`, redirect to `/admin/login` if no session (exclude `/admin/login`)
+- [ ] Update `public/robots.txt` — Disallow `/admin`
+
+### Step 2 — Login page
+- [ ] `src/app/admin/login/page.tsx` — centered single-password form
+- [ ] Server action — timing-safe compare, set cookie on success, generic error on fail
+- [ ] In-memory rate limit: 5 fails / 15 min / IP, Map-based, resets on restart
+
+### Step 3 — Data layer
+- [ ] `src/lib/admin/queries.ts` with typed functions:
+  - [ ] `getFunnelCounts()`
+  - [ ] `getProspects(filters)` with computed `days_in_state`
+  - [ ] `getProspectDetail(id)` with joined events
+  - [ ] `getMetricsTotals()` — total_prospects, total_cost, reply_rate, conversion_rate
+  - [ ] `getCostBreakdown(weeks)` — derives from `cost:*` events
+  - [ ] `getRecentEvents(limit=20)` — joined with business_name
+
+### Step 4 — Admin layout
+- [ ] `src/app/admin/layout.tsx` — sticky header, title, logout button, dark theme
+
+### Step 5 — Dashboard home (`src/app/admin/page.tsx`)
+- [ ] Metrics row (4 cards): Total Prospects | Total Spent | Reply Rate | Conversion Rate
+- [ ] Funnel chart — horizontal bars per pipeline_state, counts + % of discovered
+- [ ] Prospect table — sortable, filterable (search / state / niche), click row → detail
+- [ ] Cost breakdown — stacked bar chart (Places / Haiku / Replicate) by week
+- [ ] Recent activity feed — last 20 events, relative time, colored event pills
+
+### Step 6 — Prospect detail (`src/app/admin/prospects/[id]/page.tsx`)
+- [ ] Header: business name, owner, niche · geo, state badge, days in state
+- [ ] Left col: mockup image, website, email, source page, qualify score + breakdown
+- [ ] Right col: event timeline, collapsible JSON per event
+- [ ] Bottom: "Preview personalized page" link to `/for/{slug}`
+
+### Step 7 — API routes
+- [ ] `POST /api/admin/login` — validate password, set cookie
+- [ ] `POST /api/admin/logout` — clear cookie
+
+### Step 8 — Cost emission audit
+- [ ] Grep pipeline for API calls missing cost events
+- [ ] Add `writeProspectEvent({ event: 'cost:places'|'cost:haiku'|'cost:replicate', payload: { usd, model } })` after each call
+- [ ] Document on dashboard: "Cost data starts from {first_event_date}"
+
+### Step 9 — Mobile testing
+- [ ] Test at 375px width (iPhone 14)
+- [ ] Tables scroll horizontally with sticky first column
+- [ ] Charts readable at small width
+- [ ] Interactive targets ≥ 44px
+
+### Step 10 — Verification
+- [ ] `npm run build` passes
+- [ ] `/admin` without session → redirects to `/admin/login`
+- [ ] Wrong password → generic error
+- [ ] Correct password → cookie set, dashboard loads with live data
+- [ ] `/admin/prospects/{id}` renders detail view
+- [ ] Logout clears cookie
+- [ ] All pages render at 375px width
