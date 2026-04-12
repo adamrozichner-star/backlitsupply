@@ -39,6 +39,28 @@ export async function updatePipelineState(
 }
 
 /**
+ * Record a cost event (API spend). Not tied to a specific prospect.
+ * event format: 'cost:places' | 'cost:haiku' | 'cost:replicate'
+ */
+export async function recordCost(
+  provider: 'places' | 'haiku' | 'replicate',
+  usd: number,
+  details?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseServer()
+    if (!supabase) return
+    await supabase.from('prospect_events').insert({
+      prospect_id: null,
+      event: `cost:${provider}`,
+      payload: { usd, ...details },
+    })
+  } catch (err) {
+    console.error(`[metrics] Failed to record cost:${provider}:`, err)
+  }
+}
+
+/**
  * Record a prospect event. Fire-and-forget — never throws.
  */
 export async function recordEvent(

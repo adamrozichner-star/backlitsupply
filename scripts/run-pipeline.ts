@@ -34,7 +34,7 @@ import { createStorage } from './lib/storage'
 import { generateOutreachFixture, generateOutreach } from './lib/outreach'
 import { createLlmClient, FixtureLlmClient } from './lib/llm'
 import { makeSlug } from './lib/slug'
-import { updatePipelineState, recordEvent } from './lib/metrics'
+import { updatePipelineState, recordEvent, recordCost } from './lib/metrics'
 import { getSupabaseServer } from '../src/lib/supabase/server'
 import { writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync } from 'fs'
 import type { EnrichedProspect } from './lib/types'
@@ -188,6 +188,10 @@ async function main() {
         const listings = await source.fetchNew(geo)
         console.log(`  [discover] Found ${listings.length} listings from ${srcSlug}`)
         rawListings.push(...listings)
+        // Cost: Places searchText ≈ $0.032 per call; Comptroller + fixture are free
+        if (srcSlug === 'google-places' && listings.length > 0) {
+          await recordCost('places', 0.032, { niche: nicheName, geo: `${geo.city},${geo.state}` })
+        }
       } catch (err) {
         console.warn(`  [discover] ${srcSlug} failed: ${(err as Error).message?.slice(0, 100)}`)
         // Continue with other sources — don't let one failure stop the pipeline
@@ -337,6 +341,10 @@ async function main() {
       }
 
       stats.enriched++
+      // Cost: Haiku extraction ≈ $0.003 per call (multi-page text + tool-use)
+      if (!isFixture && existingId) {
+        await recordCost('haiku', 0.003, { stage: 'enrichment', prospect_id: existingId })
+      }
 
       // ── Stage: enriched → qualified ──
       if (!isAtOrPast(currentState, 'qualified')) {
@@ -391,6 +399,10 @@ async function main() {
               model: result.model,
               cost_usd: result.cost_usd,
             })
+            // Cost event for Replicate (0 when SharpCompositor fallback)
+            if (result.cost_usd > 0) {
+              await recordCost('replicate', result.cost_usd, { model: result.model, prospect_id: existingId })
+            }
           }
         } catch (err) {
           console.error(`    [mockup] Failed:`, err)
@@ -431,6 +443,10 @@ async function main() {
 
           if (existingId) {
             await recordEvent(existingId, 'outreach_drafted', { subject: draft.subject })
+            // Cost: Haiku outreach draft ≈ $0.002 per call
+            if (!isFixture) {
+              await recordCost('haiku', 0.002, { stage: 'outreach', prospect_id: existingId })
+            }
           }
 
           // Write to CSV with body (dedup by slug)
