@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
   title: 'Admin',
@@ -30,6 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <Toaster theme="dark" position="top-right" richColors />
     </div>
   )
 }

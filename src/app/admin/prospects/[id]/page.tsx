@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { getProspectDetail } from '@/lib/admin/queries'
+import { getProspectDetail, type PipelineState } from '@/lib/admin/queries'
 import { StateBadge } from '@/components/admin/StateBadge'
 import { EventTimeline } from '@/components/admin/EventTimeline'
+import { StateActions } from '@/components/admin/StateActions'
 import { ArrowLeft, ArrowSquareOut } from '@phosphor-icons/react/dist/ssr'
 
 export default async function ProspectDetailPage({
@@ -126,8 +127,15 @@ export default async function ProspectDetailPage({
           )}
         </div>
 
-        {/* Right col — timeline */}
-        <div>
+        {/* Right col — state actions + timeline */}
+        <div className="space-y-4">
+          {prospect.pipeline_state && (
+            <StateActions
+              prospectId={prospect.id}
+              currentState={prospect.pipeline_state as PipelineState}
+              daysInState={prospect.days_in_state}
+            />
+          )}
           <EventTimeline events={events} />
         </div>
       </div>

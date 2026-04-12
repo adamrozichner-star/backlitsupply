@@ -30,6 +30,8 @@ const EVENT_COLORS: Record<string, string> = {
   'cost:places': 'bg-cyan-500/10 text-cyan-200 border-cyan-500/20',
   'cost:haiku': 'bg-amber-500/10 text-amber-200 border-amber-500/20',
   'cost:replicate': 'bg-pink-500/10 text-pink-200 border-pink-500/20',
+  note: 'bg-yellow-500/10 text-yellow-200 border-yellow-500/20',
+  page_visited: 'bg-emerald-500/10 text-emerald-200 border-emerald-500/20',
 }
 
 function EventRow({ event }: { event: AdminEvent }) {
@@ -55,6 +57,12 @@ function EventRow({ event }: { event: AdminEvent }) {
           </button>
         )}
       </div>
+      {/* Inline render note content */}
+      {event.event === 'note' && typeof event.payload.note === 'string' && (
+        <p className="mt-2 whitespace-pre-wrap border-l-2 border-yellow-500/30 bg-yellow-500/5 p-3 text-xs leading-relaxed text-white/70">
+          {event.payload.note}
+        </p>
+      )}
       {open && hasPayload && (
         <pre className="mt-2 overflow-x-auto border border-white/5 bg-black/40 p-3 text-[10px] text-white/60">
 {JSON.stringify(event.payload, null, 2)}

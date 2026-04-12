@@ -183,3 +183,43 @@ Mobile-first. Single user (Adam). Same dark/amber theme as marketing site.
 - [ ] `/admin/prospects/{id}` renders detail view
 - [ ] Logout clears cookie
 - [ ] All pages render at 375px width
+
+---
+
+## Phase 6: Dashboard Actions + Tracking
+
+Make the admin dashboard actionable. Two small additions:
+1. Manual state transitions (Adam tracks outreach by hand this week)
+2. Tracking pixel on /for/{slug} — auto-records visits, auto-transitions sent→opened
+
+### Part 1 — Manual state actions
+- [ ] `src/lib/admin/actions.ts` — server actions:
+  - `updateProspectState(id, newState, reason?)` — session-checked, validates state enum, writes `state_change` event with `{from, to, reason, actor: 'admin_manual'}`, revalidatePath
+  - `addProspectNote(id, note)` — writes `note` event
+- [ ] `src/components/admin/StateActions.tsx` — client component with state-aware action buttons:
+  - `mockup_ready → [Mark as Sent] [Mark as Lost]`
+  - `sent → [Mark as Opened] [Mark as Replied] [Mark as Lost]`
+  - `opened → [Mark as Replied] [Mark as Lost]`
+  - `replied → [Mark as Positive] [Mark as Lost]`
+  - `positive → [Mark as Booked] [Mark as Lost]`
+  - `booked → [Mark as Won] [Mark as Lost]`
+  - `won → (terminal)`
+  - `lost/dead → [Reactivate to Discovered]`
+  - Toasts via `sonner`
+- [ ] `src/components/admin/NoteForm.tsx` — textarea + submit, calls `addProspectNote`
+- [ ] Update `src/app/admin/prospects/[id]/page.tsx` — StateActions above timeline, NoteForm below
+
+### Part 2 — Tracking pixel
+- [ ] `src/app/api/track/visit/route.ts` — GET endpoint:
+  - reads `?slug=xxx`, checks `visited` cookie for 1h dedupe
+  - looks up prospect, writes `page_visited` event with `{user_agent, referer, ip_truncated, actor: 'tracking_pixel'}`
+  - if current state is `sent`, auto-transitions to `opened` + writes state_change event
+  - appends slug to `visited` cookie (1h TTL)
+  - always returns 1x1 transparent gif with `cache-control: no-store`
+- [ ] Update `src/app/for/[slug]/page.tsx` — add server-rendered `<img src="/api/track/visit?slug=..." width="1" height="1" style={{position:'absolute',left:'-9999px'}} />`
+- [ ] IP truncation: first 3 octets IPv4 / first 4 segments IPv6
+- [ ] Update `public/robots.txt` — Disallow `/api/track`
+
+### Part 3 — Verification
+- [ ] Local: sign in, mark mockup_ready → sent → opened; add note; incognito visit /for/{slug} → event appears, auto-transitions sent→opened; second visit within 1h → no duplicate; different browser → new event
+- [ ] Production: same flow on backlitsupply.com
