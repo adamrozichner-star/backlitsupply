@@ -114,8 +114,14 @@ async function main() {
   const useFixtureLlm = isFixture
 
   if (isFixture) process.env.PIPELINE_SOURCE = 'fixture'
-  // Set niche query for Outscraper/Google Places search term
+  // Set niche query for Outscraper/Google Places search term(s).
+  // PIPELINE_NICHE_QUERIES is a JSON array for multi-query niches (fitness, coffee, etc.)
   process.env.PIPELINE_NICHE_QUERY = nicheConfig.displayName
+  if (nicheConfig.placesQueries && nicheConfig.placesQueries.length > 0) {
+    process.env.PIPELINE_NICHE_QUERIES = JSON.stringify(nicheConfig.placesQueries)
+  } else {
+    delete process.env.PIPELINE_NICHE_QUERIES
+  }
 
   const llm = useFixtureLlm
     ? new FixtureLlmClient({
@@ -172,7 +178,7 @@ async function main() {
   }
 
   let successCount = 0
-  const stats = { discovered: 0, enriched: 0, qualified: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0 }
+  const stats = { discovered: 0, enriched: 0, qualified: 0, mockup_gated: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0 }
 
   for (const geo of geos) {
     console.log(`\n── Geo: ${geo.city}, ${geo.state} ──`)
@@ -188,9 +194,17 @@ async function main() {
         const listings = await source.fetchNew(geo)
         console.log(`  [discover] Found ${listings.length} listings from ${srcSlug}`)
         rawListings.push(...listings)
-        // Cost: Places searchText ≈ $0.032 per call; Comptroller + fixture are free
-        if (srcSlug === 'google-places' && listings.length > 0) {
-          await recordCost('places', 0.032, { niche: nicheName, geo: `${geo.city},${geo.state}` })
+        // Cost: Places searchText ≈ $0.032 per call; Comptroller + fixture are free.
+        // Niches with multiple placesQueries make N API calls — emit one cost event per query.
+        if (srcSlug === 'google-places') {
+          const numQueries = nicheConfig.placesQueries?.length || 1
+          for (let i = 0; i < numQueries; i++) {
+            await recordCost('places', 0.032, {
+              niche: nicheName,
+              geo: `${geo.city},${geo.state}`,
+              query_index: i,
+            })
+          }
         }
       } catch (err) {
         console.warn(`  [discover] ${srcSlug} failed: ${(err as Error).message?.slice(0, 100)}`)
@@ -348,7 +362,10 @@ async function main() {
 
       // ── Stage: enriched → qualified ──
       if (!isAtOrPast(currentState, 'qualified')) {
-        const qual = qualifyProspect(enriched, nicheConfig.qualify)
+        const qual = qualifyProspect(enriched, nicheConfig.qualify, {
+          chainBlocklist: nicheConfig.chainBlocklist,
+          qualifyBoosts: nicheConfig.qualifyBoosts,
+        })
 
         if (qual.killed_as_chain) {
           console.log(`    [qualify] CHAIN KILLED — ${qual.chain_reason}`)
@@ -369,6 +386,27 @@ async function main() {
       }
 
       stats.qualified++
+
+      // ── Sendability gate: skip mockup generation if owner or email missing ──
+      // Default gate is true; niche config can set mockupGate: false to override.
+      const gateEnabled = nicheConfig.mockupGate !== false
+      if (gateEnabled && !isAtOrPast(currentState, 'mockup_ready')) {
+        const hasOwner = !!enriched.owner_first_name
+        const hasEmail = !!enriched.email && isValidEmail(enriched.email)
+        if (!hasOwner || !hasEmail) {
+          const reason = !hasOwner ? 'no_owner' : 'no_email'
+          console.log(`    [gate] Skipping mockup — ${reason}`)
+          if (existingId) {
+            await recordEvent(existingId, 'gate:mockup_skipped', {
+              reason,
+              has_owner: hasOwner,
+              has_email: hasEmail,
+            })
+          }
+          stats.mockup_gated++
+          continue  // stay at qualified, don't advance
+        }
+      }
 
       // ── Stage: qualified → mockup_ready ──
       if (!isAtOrPast(currentState, 'mockup_ready') && !dryRun) {
@@ -477,6 +515,7 @@ async function main() {
   console.log(`  Discovered: ${stats.discovered}`)
   console.log(`  Enriched: ${stats.enriched}`)
   console.log(`  Qualified: ${stats.qualified}`)
+  console.log(`  Mockup-gated (no owner/email): ${stats.mockup_gated}`)
   console.log(`  Mockups: ${stats.mockups}`)
   console.log(`  Outreach: ${stats.outreach}`)
   console.log(`  Skipped (done): ${stats.skipped_done}`)

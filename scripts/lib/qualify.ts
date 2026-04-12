@@ -5,10 +5,14 @@
  * Niche config sets threshold — below threshold → no mockup spent.
  *
  * Chain businesses are auto-killed before scoring. Chains are never real prospects.
+ *
+ * Niche config can also provide:
+ * - `chainBlocklist`: niche-specific chain names (merged with global list)
+ * - `qualifyBoosts`: role-evidence pattern boosts (e.g. +10 for DDS/DMD)
  */
 
 import type { EnrichedProspect } from './types'
-import type { QualifyConfig } from '../../niches/types'
+import type { QualifyConfig, QualifyBoost } from '../../niches/types'
 
 // ─── Chain detection ────────────────────────────────────
 
@@ -25,9 +29,12 @@ const KNOWN_CHAINS = new Set([
   "gordon ramsay", 'nobu', 'hakkasan', 'catch', 'carbone',
 ])
 
-function isChainByName(name: string): boolean {
+function isChainByName(name: string, extraChains: Set<string>): boolean {
   const lower = name.toLowerCase().trim()
   for (const chain of KNOWN_CHAINS) {
+    if (lower.includes(chain)) return true
+  }
+  for (const chain of extraChains) {
     if (lower.includes(chain)) return true
   }
   return false
@@ -50,9 +57,15 @@ export interface QualifyResult {
 export function qualifyProspect(
   prospect: EnrichedProspect,
   config: QualifyConfig,
+  options: { chainBlocklist?: string[]; qualifyBoosts?: QualifyBoost[] } = {},
 ): QualifyResult {
+  // Merge niche chain list with global
+  const extraChains = new Set(
+    (options.chainBlocklist || []).map(c => c.toLowerCase().trim()),
+  )
+
   // ── Chain kill check (before scoring) ──
-  if (isChainByName(prospect.business_name)) {
+  if (isChainByName(prospect.business_name, extraChains)) {
     return {
       score: 0, passed: false, killed_as_chain: true,
       chain_reason: 'known chain name',
@@ -113,6 +126,22 @@ export function qualifyProspect(
     breakdown.social = 15
   } else {
     breakdown.social = 0
+  }
+
+  // Niche-specific role-evidence boosts (variable)
+  if (options.qualifyBoosts && prospect.owner_role_evidence) {
+    const evidence = prospect.owner_role_evidence.toLowerCase()
+    let boost = 0
+    const matched: string[] = []
+    for (const b of options.qualifyBoosts) {
+      if (evidence.includes(b.pattern.toLowerCase())) {
+        boost += b.points
+        matched.push(b.pattern)
+      }
+    }
+    if (boost > 0) {
+      breakdown.role_boost = boost
+    }
   }
 
   const score = Object.values(breakdown).reduce((sum, v) => sum + v, 0)
