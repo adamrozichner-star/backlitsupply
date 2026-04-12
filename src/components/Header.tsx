@@ -2,10 +2,15 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { NAV_LINKS } from '@/lib/config'
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const pathname = usePathname()
+
+  // Hide marketing header on admin routes
+  if (pathname?.startsWith('/admin')) return null
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md">
