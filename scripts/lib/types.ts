@@ -45,6 +45,7 @@ export interface EnrichedProspect {
   business_name: string
   owner_first_name?: string
   owner_last_name?: string
+  owner_role_evidence?: string  // verbatim snippet with role title, preserved for qualify boosts
   email?: string
   phone?: string
   website?: string

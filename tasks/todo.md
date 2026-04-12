@@ -223,3 +223,41 @@ Make the admin dashboard actionable. Two small additions:
 ### Part 3 — Verification
 - [ ] Local: sign in, mark mockup_ready → sent → opened; add note; incognito visit /for/{slug} → event appears, auto-transitions sent→opened; second visit within 1h → no duplicate; different browser → new event
 - [ ] Production: same flow on backlitsupply.com
+
+---
+
+## Phase 7A: Multi-Niche Expansion
+
+Add 4 new niches, gate mockups behind sendability, build per-niche
+dashboard, ship batch runner. No Instantly yet (Phase 7C).
+
+### Part 1 — 4 new niche configs (genuinely differentiated)
+- [ ] `niches/dental-practices.ts` — Austin TX, DDS/DMD role boost, chainBlocklist (Aspen, Heartland, Pacific Dental, etc.), clinical-premium angle
+- [ ] `niches/boutique-fitness.ts` — Miami FL, founder/instructor role boost, chainBlocklist (F45, OTF, Barry's, SoulCycle, etc.), community-energy angle
+- [ ] `niches/tattoo-shops.ts` — Nashville TN, threshold 50 (owner info often IG-only), owner/artist role boost, no chainBlocklist, craft-aesthetic angle
+- [ ] `niches/coffee-shops.ts` — Portland OR, threshold 65 (hardest to enrich), roaster/founder boost, chainBlocklist (Starbucks, Dunkin, Blue Bottle, etc.), warm-independent angle
+
+### Part 2 — Mockup gate (cost saver)
+- [ ] `NicheConfig.mockupGate: boolean` (default true)
+- [ ] Pipeline gate: qualified → mockup_ready only if owner_first_name AND email both present
+- [ ] Otherwise stays at qualified, logs `gate:mockup_skipped` event with reason
+- [ ] Batch summary logs skipped counts
+
+### Part 3 — Per-niche dashboard
+- [ ] `src/app/admin/niches/page.tsx` — comparative table with all niches side by side
+- [ ] Above table: 5 mini-funnels with shared y-axis scale
+- [ ] Per-niche "View prospects" link → `/admin?niche={slug}`
+- [ ] Verify/fix existing prospect table niche filtering
+- [ ] Admin header nav link to `/admin/niches`
+- [ ] `getMetricsByNiche()` query — single GROUP BY, no N+1
+
+### Part 4 — Batch runner
+- [ ] `scripts/run-batch.ts` — args: --niches, --limit-per-niche, --dry-run
+- [ ] Invokes run-pipeline.ts per niche as subprocess, 60s gap between niches
+- [ ] Captures logs to `scripts/output/batch-{date}/{niche}.log`
+- [ ] Writes `scripts/output/batch-{date}/summary.md` with cost + time totals
+- [ ] `npm run batch` script added
+
+### Part 5 — Docs
+- [ ] Update `scripts/README.md` with 5-niche batch instructions
+- [ ] Add Phase 7B (Adam manual signups) + 7C (Instantly in 2 weeks) stubs here

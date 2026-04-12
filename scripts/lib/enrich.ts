@@ -382,6 +382,7 @@ export async function enrichListing(
     business_name: listing.business_name,
     owner_first_name: ownerFirst,
     owner_last_name: ownerLast,
+    owner_role_evidence: contact.owner_role_evidence,
     email: contact.contact_email,
     phone: listing.phone,
     website: listing.website,
