@@ -15,6 +15,35 @@ npm run test:pipeline
 npm run loop -- --source=fixture --limit=3
 ```
 
+## Running the 5-niche test
+
+Live multi-niche batch. Requires these env vars in `.env.local`:
+
+- `GOOGLE_PLACES_API_KEY` — discovery
+- `ANTHROPIC_API_KEY` — enrichment + outreach drafting
+- `REPLICATE_API_TOKEN` — mockup generation
+- `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SECRET_KEY` — state persistence
+
+```bash
+npm run batch -- \
+  --niches=med-spa,dental-practices,boutique-fitness,tattoo-shops,coffee-shops \
+  --limit-per-niche=50
+```
+
+Expected:
+- **Runtime**: ~25 min (5 niches × ~3 min pipeline + 4 × 60s gaps)
+- **Cost**: ~$15–20 (Places $0.03/query, Haiku $0.003/enrichment, Replicate $0.039/mockup)
+- **Output**: ~250 prospects in Supabase, ~80–150 with mockups (only sendable ones pass the gate)
+- **Logs**: `scripts/output/batch-{date}/{niche}.log` per niche
+- **Summary**: `scripts/output/batch-{date}/summary.md` with per-niche enrichment hit rate —
+  the single most valuable number, showing which niches are actually viable with current enrichment.
+
+Dry-run (skips mockup gen but still hits Places + Haiku, ~$0.04/prospect):
+
+```bash
+npm run batch -- --niches=med-spa,dental-practices --limit-per-niche=2 --dry-run
+```
+
 ## Add a new niche (10 minutes)
 
 1. Create `niches/your-niche.ts`:

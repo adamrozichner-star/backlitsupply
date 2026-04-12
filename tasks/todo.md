@@ -261,3 +261,32 @@ dashboard, ship batch runner. No Instantly yet (Phase 7C).
 ### Part 5 — Docs
 - [ ] Update `scripts/README.md` with 5-niche batch instructions
 - [ ] Add Phase 7B (Adam manual signups) + 7C (Instantly in 2 weeks) stubs here
+
+---
+
+## Phase 7B: Adam's manual signup work (this week)
+
+No code — action items for Adam before Phase 7C can ship.
+
+- [ ] Sign up for Instantly.ai account (or equivalent cold email infra)
+- [ ] Register warm-up domain(s) — recommended: `hello-backlit.com` or
+      `backlit-mail.com` as a sending alias; keep `backlitsupply.com` clean
+- [ ] Google Workspace setup: SPF, DKIM, DMARC records for the sending domain
+- [ ] Warmup schedule: 2 weeks minimum before any outbound sends
+- [ ] Import the 3 personal replies from this week's batch as Instantly contacts
+
+## Phase 7C: Instantly integration (~2 weeks out, post-warmup)
+
+Automate the "send email" step. Unblocks scaling from 10/day to 100/day.
+
+- [ ] `scripts/lib/outreach-providers/instantly.ts` — push drafted outreach
+      to Instantly campaigns via their API
+- [ ] Pipeline stage: mockup_ready → sent auto-transition when Instantly
+      confirms send. Manual "Mark as Sent" button stays as fallback.
+- [ ] Instantly reply webhook: POST /api/webhooks/instantly
+  - classify reply via reply-classifier.ts (Haiku)
+  - auto-transition: replied → positive | objection | unsubscribe | ooo
+  - log inbound body as a note event
+- [ ] Admin dashboard: show per-campaign reply/positive rate, not just per-niche
+- [ ] Kill switch auto-pause: if reply rate in a niche drops below config
+      threshold for N days, flag in dashboard (don't auto-stop — Adam decides)
