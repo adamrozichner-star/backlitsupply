@@ -157,16 +157,54 @@ async function main() {
   assert('hasValidOwnerRole("") → false', !hasValidOwnerRole(''))
   assert('hasValidOwnerRole("Lead Esthetician") → false', !hasValidOwnerRole('Lead Esthetician'))
 
+  // BUG 1 regression tests — these all rejected pre-v3 but contain valid ownership signals
+  assert('Treaty Oak Dental ("own") → true',
+    hasValidOwnerRole('he feels blessed to have the opportunity to practice at and own Treaty Oak Dental'))
+  assert('Beaux MedSpa ("Founded by") → true',
+    hasValidOwnerRole('Founded by Kristin Gunn, a nationally recognized skincare expert'))
+  assert('Forest Family Dentistry ("Founded by") → true',
+    hasValidOwnerRole('Founded by Dr. Robin Bethell'))
+  assert('Breeze Dental ("founded") → true',
+    hasValidOwnerRole('In 2024, Dr Josh founded Breeze Dental'))
+  assert('Austin Dental Center ("led by") → true',
+    hasValidOwnerRole('The Austin Dental Center team is led by Dr. John N. Glennon'))
+  assert('High Point Dentistry ("founded in") → true',
+    hasValidOwnerRole('founded in 2009 by Dr. Vu Kong'))
+
+  // Negative cases must still reject
+  assert('"member of the American Dental Association" → false (testimonial-style)',
+    !hasValidOwnerRole('He is also an active member of the American Dental Association'))
+  assert('"Dr. Patrick Campbell is truly amazing" → false (testimonial)',
+    !hasValidOwnerRole('Dr. Patrick Campbell is truly amazing, extremely professional, honest, and welcoming'))
+
+  // BUG 2 — Comptroller administrative shell filter
+  console.log('\nTest 8: Comptroller administrative shell filter')
+  const { isAdministrativeShell } = await import('./lib/sources/comptroller-tx')
+  assert('"Aesthetics By Tess LLC" → shell', isAdministrativeShell('Aesthetics By Tess LLC'))
+  assert('"Medspa Logic LLC" → shell', isAdministrativeShell('Medspa Logic LLC'))
+  assert('"Medspa Resources, LLC" → shell', isAdministrativeShell('Medspa Resources, LLC'))
+  assert('"Med Spas Of Texas PLLC" → shell', isAdministrativeShell('Med Spas Of Texas PLLC'))
+  assert('"Some Company Inc." → shell', isAdministrativeShell('Some Company Inc.'))
+  assert('"Some Holding Corp" → shell', isAdministrativeShell('Some Holding Corp'))
+  assert('"Some Group LP" → shell', isAdministrativeShell('Some Group LP'))
+  assert('"Aesthetics By Anika Limited Liability Company" → shell',
+    isAdministrativeShell('Aesthetics By Anika Limited Liability Company'))
+  // Real businesses (no corporate suffix in public name) — should NOT be flagged
+  assert('"Glow MedSpa" → not shell', !isAdministrativeShell('Glow MedSpa'))
+  assert('"Beaux MedSpa" → not shell', !isAdministrativeShell('Beaux MedSpa'))
+  assert('"Treaty Oak Dental" → not shell', !isAdministrativeShell('Treaty Oak Dental'))
+
   // ── Test 7: Enrichment version guard ───────────────────
   console.log('\nTest 7: Enrichment version guard')
   const { CURRENT_ENRICHMENT_VERSION } = await import('./lib/enrich')
-  assert('CURRENT_ENRICHMENT_VERSION is 2', CURRENT_ENRICHMENT_VERSION === 2)
+  assert('CURRENT_ENRICHMENT_VERSION is 3', CURRENT_ENRICHMENT_VERSION === 3)
   // A v1 prospect at qualified state should be detected as stale
   // (pipeline would reset to discovered and re-enrich)
   const staleVersion = 1
   const isStale = staleVersion < CURRENT_ENRICHMENT_VERSION
   assert('v1 prospect is stale (< CURRENT_ENRICHMENT_VERSION)', isStale)
-  assert('v2 prospect is current (= CURRENT_ENRICHMENT_VERSION)', !(2 < CURRENT_ENRICHMENT_VERSION))
+  assert('v2 prospect is now stale (< CURRENT_ENRICHMENT_VERSION)', 2 < CURRENT_ENRICHMENT_VERSION)
+  assert('v3 prospect is current (= CURRENT_ENRICHMENT_VERSION)', !(3 < CURRENT_ENRICHMENT_VERSION))
 
   // ── Summary ───────────────────────────────────────────
   console.log(`\n═══ Results: ${passed} passed, ${failed} failed ═══`)

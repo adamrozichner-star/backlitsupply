@@ -19,8 +19,10 @@ import type { QualifyConfig } from '../../niches/types'
  * Pipeline will force-re-enrich any prospect with a lower version on resume.
  *   v1 = homepage-only, no role evidence gate
  *   v2 = multi-page crawl + owner role evidence guardrail
+ *   v3 = expanded role tokens (founded/owns/led by/possessives) + same-sentence
+ *        name extraction prompt — fixes false rejections of valid ownership signals
  */
-export const CURRENT_ENRICHMENT_VERSION = 2
+export const CURRENT_ENRICHMENT_VERSION = 3
 
 // ─── Logo discovery ─────────────────────────────────────
 
@@ -128,13 +130,34 @@ interface ContactInfo {
 /**
  * Validate that owner_role_evidence contains a recognized ownership/leadership token.
  * If not, the name is likely from a testimonial, staff listing, or other non-ownership context.
+ *
+ * Tokens cover three categories:
+ *   1. Noun titles: founder, owner, CEO, principal
+ *   2. Verb forms: founded, owns, opened, started, established, leads
+ *   3. Possessives: "his/her/my practice", "owner-operator"
  */
 const OWNER_ROLE_TOKENS = [
-  'founder', 'co-founder', 'cofounder',
-  'owner', 'co-owner', 'coowner',
-  'medical director', 'ceo', 'president', 'principal',
-  'md', 'np', 'rn-bsn', 'proprietor',
+  // Noun titles
+  'founder', 'co-founder', 'cofounder', 'co founder',
+  'owner', 'co-owner', 'coowner', 'co owner',
+  'owner-operator', 'owner operator',
+  'owner/dentist', 'owner/founder', 'owner/physician',
+  'medical director', 'clinical director',
+  'ceo', 'president', 'principal', 'proprietor',
+  'md', 'np', 'rn-bsn', 'dds', 'dmd',
   'chief', 'managing',
+  // Verb forms
+  'founded', 'founded by', 'founded in',
+  'owns', 'own ', 'owned by',
+  'started', 'started by', 'started in',
+  'opened', 'opened by', 'opened in',
+  'established', 'established by',
+  'led by', 'leads', 'leading',
+  // Possessives
+  'his practice', 'her practice', 'my practice',
+  'his clinic', 'her clinic', 'my clinic',
+  'his shop', 'her shop', 'my shop',
+  'his studio', 'her studio', 'my studio',
 ]
 
 export function hasValidOwnerRole(evidence: string | null | undefined): boolean {
@@ -281,7 +304,23 @@ async function extractContact(
 
   const result = await llm.extract<ContactInfo>({
     system: 'You extract structured contact information from business website text. Return null for any field you cannot find — never return placeholder strings like "unknown", "N/A", or "not found".',
-    prompt: `Extract the owner/founder name and contact email for "${businessName}" from this website text (may include multiple pages). Look for names associated with titles like "owner", "founder", "CEO", "medical director", "lead provider". If a field is not present, return null — do NOT guess or use placeholders.\n\n${combinedText}`,
+    prompt: `Extract the owner/founder name and contact email for "${businessName}" from this website text (may include multiple pages).
+
+OWNERSHIP SIGNALS to look for include:
+- Noun titles: "owner", "founder", "CEO", "principal", "proprietor", "medical director"
+- Verb forms: "founded by X", "founded in YEAR by X", "owns", "started by X", "opened by X", "led by X", "established by X"
+- Possessives: "his practice", "her clinic", "my studio"
+- Doctor titles in single-doctor practices: "Dr. X is the dentist/physician at..."
+
+CRITICAL EXTRACTION RULE: When you find any ownership signal above, extract the person's name from the SAME SENTENCE and return it as owner_first_name + owner_last_name. Do NOT return null for the name if a name is present in the ownership-signal sentence.
+
+For owner_role_evidence, return the EXACT verbatim sentence (max 150 chars) containing the ownership signal — not a paraphrase.
+
+If no ownership signal exists anywhere in the text, return null for all fields.
+
+Do NOT use placeholder strings like "unknown", "N/A", "not found".
+
+${combinedText}`,
     tools: [CONTACT_EXTRACT_TOOL],
     toolChoice: 'extract_contact',
   })

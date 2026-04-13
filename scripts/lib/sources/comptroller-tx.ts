@@ -53,6 +53,35 @@ export interface ComptrollerResponse {
   count: number
 }
 
+/**
+ * Detect administrative shell entities that exist on paper but aren't real
+ * customer-facing businesses. Comptroller returns name+taxpayerId+zip only —
+ * no website or phone — so we can't gate on contact info. The cleanest
+ * available signal is the entity name itself: pure-corporate-suffix names
+ * ("Medspa Logic LLC", "Aesthetics By Tess LLC") are paperwork holdings,
+ * not storefronts.
+ *
+ * Heuristic: drop if name ends in a corporate suffix AND has no descriptive
+ * brand word (no spa/clinic/aesthetics/dental/etc.) before the suffix.
+ * In practice the simplest version — drop anything ending in a bare suffix
+ * after stripping common business descriptors — catches all the offenders
+ * tonight without killing real "Glow MedSpa LLC" style names.
+ *
+ * Approach: consider the name without the trailing suffix. If what remains
+ * looks like a generic word combo with no proper noun (e.g. "Aesthetics By
+ * Tess", "Medspa Logic", "Medspa Resources"), drop it. We approximate this
+ * as: drop if name ends in a corporate suffix, since real businesses
+ * (Glow MedSpa, Beaux MedSpa, Drip IV Bar) typically don't include the
+ * suffix in their public-facing name. The few legitimate hits with " LLC"
+ * (e.g. "Aesthetica Med Spa, LLC") will be re-discovered via Google Places
+ * with the cleaner name and merged.
+ */
+const SHELL_SUFFIX_REGEX = /\b(LLC|L\.L\.C\.|Inc\.?|PLLC|P\.L\.L\.C\.|LP|L\.P\.|Corp\.?|Limited Liability Company|Limited Partnership)\.?$/i
+
+export function isAdministrativeShell(name: string): boolean {
+  return SHELL_SUFFIX_REGEX.test(name.trim())
+}
+
 function parseResponse(json: ComptrollerResponse, geo: GeoConfig, nameRegex?: RegExp): RawListing[] {
   if (!json.success || !json.data) return []
 
@@ -60,6 +89,10 @@ function parseResponse(json: ComptrollerResponse, geo: GeoConfig, nameRegex?: Re
 
   return json.data
     .filter(entity => {
+      // Drop administrative shells (LLC/Inc/PLLC names with no website signal).
+      // Comptroller returns no contact info, so name pattern is the only filter we have.
+      if (isAdministrativeShell(entity.name)) return false
+
       // Filter by zip if we have a zip set for this geo
       if (validZips) {
         const zip5 = entity.mailingAddressZip?.slice(0, 5)
