@@ -177,6 +177,32 @@ async function main() {
   assert('"Dr. Patrick Campbell is truly amazing" → false (testimonial)',
     !hasValidOwnerRole('Dr. Patrick Campbell is truly amazing, extremely professional, honest, and welcoming'))
 
+  // THING 1 — word boundary regex regression tests
+  console.log('\nTest 7b: Word-boundary regex (false-positive prevention)')
+  // Adversarial NEGATIVES — substring includes() would have falsely matched these
+  assert('"downtown Austin medical group" → false (own ⊂ downtown)',
+    !hasValidOwnerRole('downtown Austin medical group'))
+  assert('"fueled by passion for dentistry" → false (led by ⊂ fueled by passion)',
+    !hasValidOwnerRole('fueled by passion for dentistry'))
+  assert('"well-known throughout the area" → false (own ⊂ known)',
+    !hasValidOwnerRole('well-known throughout the area'))
+  assert('"established neighborhood favorite" → false (no ownership context)',
+    !hasValidOwnerRole('established neighborhood favorite'))
+  assert('"founders neighborhood" → false (founder + s, no \\b)',
+    !hasValidOwnerRole('founders neighborhood'))
+
+  // POSITIVES — must still match
+  assert('"Dr. Smith owns the practice" → true',
+    hasValidOwnerRole('Dr. Smith owns the practice'))
+  assert('"founded by Dr. Smith in 2010" → true',
+    hasValidOwnerRole('founded by Dr. Smith in 2010'))
+  assert('"Dr. Smith leads our team" → true',
+    hasValidOwnerRole('Dr. Smith leads our team'))
+  assert('"his practice has served Austin" → true',
+    hasValidOwnerRole('his practice has served Austin'))
+  assert('"she founded the clinic in 2005" → true',
+    hasValidOwnerRole('she founded the clinic in 2005'))
+
   // BUG 2 — Comptroller administrative shell filter
   console.log('\nTest 8: Comptroller administrative shell filter')
   const { isAdministrativeShell } = await import('./lib/sources/comptroller-tx')

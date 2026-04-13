@@ -128,42 +128,61 @@ interface ContactInfo {
 }
 
 /**
- * Validate that owner_role_evidence contains a recognized ownership/leadership token.
- * If not, the name is likely from a testimonial, staff listing, or other non-ownership context.
+ * Validate that owner_role_evidence contains a recognized ownership/leadership signal.
+ * Uses word-boundary regex (NOT substring includes) to prevent false positives like
+ * "downtown" matching "own", "fueled by" matching "led by", "established neighborhood"
+ * matching as ownership, etc.
  *
- * Tokens cover three categories:
- *   1. Noun titles: founder, owner, CEO, principal
- *   2. Verb forms: founded, owns, opened, started, established, leads
- *   3. Possessives: "his/her/my practice", "owner-operator"
+ * Categories covered:
+ *   1. Noun titles: founder, owner, CEO, principal, proprietor, medical/clinic director
+ *   2. Verb forms: founded, founded by/in, owns, owned by, started, opened, established by, led by, leads
+ *   3. Possessives + noun: his/her/my practice|clinic|shop|studio|office
+ *   4. Compound titles: owner-operator, owner/dentist, owner/founder
+ *   5. Professional credentials: MD, DDS, DMD, NP, RN-BSN
+ *
+ * Plain "established" or "founders" alone are NOT enough — they need ownership context
+ * (e.g., "founded by Dr. X", not "founders neighborhood").
  */
-const OWNER_ROLE_TOKENS = [
-  // Noun titles
-  'founder', 'co-founder', 'cofounder', 'co founder',
-  'owner', 'co-owner', 'coowner', 'co owner',
-  'owner-operator', 'owner operator',
-  'owner/dentist', 'owner/founder', 'owner/physician',
-  'medical director', 'clinical director',
-  'ceo', 'president', 'principal', 'proprietor',
-  'md', 'np', 'rn-bsn', 'dds', 'dmd',
-  'chief', 'managing',
-  // Verb forms
-  'founded', 'founded by', 'founded in',
-  'owns', 'own ', 'owned by',
-  'started', 'started by', 'started in',
-  'opened', 'opened by', 'opened in',
-  'established', 'established by',
-  'led by', 'leads', 'leading',
-  // Possessives
-  'his practice', 'her practice', 'my practice',
-  'his clinic', 'her clinic', 'my clinic',
-  'his shop', 'her shop', 'my shop',
-  'his studio', 'her studio', 'my studio',
-]
+const ROLE_REGEX = new RegExp(
+  [
+    // Noun titles (singular forms with strict word boundaries)
+    '\\b(co-?)?founder\\b',
+    '\\b(co-?)?owner(s|-operator|/dentist|/founder|/physician)?\\b',
+    '\\bproprietor\\b',
+    '\\bprincipal\\b',
+    '\\bpresident\\b',
+    '\\bceo\\b',
+    '\\b(medical|clinical) director\\b',
+    '\\bmanaging (partner|director|member)\\b',
+    // Explicit "X by Y" forms (always ownership context)
+    '\\bfounded by\\b',
+    '\\bestablished by\\b',
+    '\\bopened by\\b',
+    '\\bstarted by\\b',
+    '\\bowned by\\b',
+    // Year-anchored forms ("founded in 2010")
+    '\\b(founded|established|opened|started) in \\d{4}\\b',
+    // "led by Dr." or "led by Capital-Name" (not "led by passion")
+    '\\bled by (dr\\.?|mr\\.?|mrs\\.?|ms\\.?|[A-Z][a-z]+)',
+    // Subject + ownership verb, allowing 0-3 words between (handles "Dr. Smith owns",
+    // "Dr Josh founded", "she founded", "he opened")
+    '\\b(he|she|dr\\.?|mr\\.?|mrs\\.?|ms\\.?)(\\s+[A-Z][\\w\\.]*){0,3}\\s+(owns|founded|opened|started|leads|established)\\b',
+    // Infinitive / coordinating forms: "to own X", "and own X", "to founded X"
+    // Captures "opportunity to ... and own Treaty Oak Dental"
+    '\\b(to|and) (own|found|open|start) [A-Z]',
+    // Plural pronouns owning things
+    '\\b(i|we|they) (own|founded|opened|started)\\b',
+    // Possessive + business noun ("his practice", "her clinic")
+    '\\b(his|her|my)\\s+(practice|clinic|shop|studio|office|business)\\b',
+    // Professional credentials (post-nominal)
+    '\\b(dds|dmd|md|np|rn-bsn|do|pa-c)\\b',
+  ].join('|'),
+  'i',
+)
 
 export function hasValidOwnerRole(evidence: string | null | undefined): boolean {
   if (!evidence) return false
-  const lower = evidence.toLowerCase()
-  return OWNER_ROLE_TOKENS.some(token => lower.includes(token))
+  return ROLE_REGEX.test(evidence)
 }
 
 /**
