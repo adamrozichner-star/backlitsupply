@@ -80,6 +80,58 @@ export async function updateProspectState(
   }
 }
 
+/**
+ * Run mockup verification against production for a single prospect.
+ * Writes a mockup_verified or mockup_broken event.
+ */
+export async function verifyProspectMockup(prospectId: string): Promise<ActionResult & { detail?: string }> {
+  try {
+    await requireAdmin()
+
+    const sb = getSupabaseServer()
+    if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+    const { data: p } = await sb
+      .from('prospects')
+      .select('slug, pipeline_state, mockup_url')
+      .eq('id', prospectId)
+      .single()
+
+    if (!p || !p.slug) return { ok: false, error: 'Prospect not found' }
+
+    const { verifyOne } = await import('../../../scripts/verify-mockups')
+    const result = await verifyOne(p.slug, p.pipeline_state!, p.mockup_url)
+
+    await sb.from('prospect_events').insert({
+      prospect_id: prospectId,
+      event: result.ok ? 'mockup_verified' : 'mockup_broken',
+      payload: {
+        url: result.image_url,
+        image_status: result.image_status,
+        content_type: result.image_content_type,
+        size: result.image_size,
+        reason: result.reason,
+        actor: 'admin_manual',
+      },
+    })
+
+    revalidatePath('/admin')
+    revalidatePath(`/admin/prospects/${prospectId}`)
+
+    return {
+      ok: result.ok,
+      error: result.ok ? undefined : result.reason,
+      detail: result.ok
+        ? `${((result.image_size || 0) / 1024).toFixed(0)}KB ${result.image_content_type}`
+        : result.reason,
+    }
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error'
+    console.error('[actions] verifyProspectMockup error:', msg)
+    return { ok: false, error: msg === 'Unauthorized' ? 'Unauthorized' : 'Action failed' }
+  }
+}
+
 export async function addProspectNote(
   prospectId: string,
   note: string,

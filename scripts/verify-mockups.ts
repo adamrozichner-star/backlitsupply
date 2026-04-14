@@ -1,134 +1,195 @@
 /**
- * Verify mockup sanity: dimensions, file size, amber glow pixels.
- * Copies passing mockups to scripts/output/review/.
+ * Mockup verification — fetch the production /for/{slug} page for every
+ * mockup_ready+ prospect and confirm the mockup image actually renders.
+ *
+ * For each prospect:
+ *   1. GET https://backlitsupply.com/for/{slug}
+ *   2. Parse HTML, find mockup <img> tag
+ *   3. GET the image src URL
+ *   4. Verify: status 200, content-type image/*, content-length > 10KB
+ *   5. Write a mockup_verified or mockup_broken event
+ *
+ * Exit code: 1 if ANY prospect has a broken mockup, 0 otherwise.
+ *
+ * Usage:
+ *   npm run verify
+ *   npx tsx scripts/verify-mockups.ts --slug=ulala-med-spa-austin  (single prospect)
+ *   VERIFY_BASE_URL=http://localhost:3000 npm run verify            (local dev)
  */
 
-import sharp from 'sharp'
+import { config } from 'dotenv'
 import { resolve } from 'path'
-import { readdirSync, mkdirSync, copyFileSync, existsSync } from 'fs'
-import { statSync } from 'fs'
+config({ path: resolve(__dirname, '../.env.local') })
 
-const MOCKUP_DIR = resolve(__dirname, 'output/test-mockups')
-const REVIEW_DIR = resolve(__dirname, 'output/review')
+import { getSupabaseServer } from '../src/lib/supabase/server'
 
-const EXPECTED_W = 1600
-const EXPECTED_H = 1000
-const MIN_SIZE_KB = 50
-const MAX_SIZE_KB = 500
+const BASE_URL = process.env.VERIFY_BASE_URL || 'https://backlitsupply.com'
+const MIN_IMAGE_BYTES = 10 * 1024  // 10KB — anything smaller is a 404 placeholder or broken gif
+const VERIFIABLE_STATES = ['mockup_ready', 'sent', 'opened', 'replied', 'positive', 'booked', 'won']
 
-// Amber hue range in degrees (HSL)
-const AMBER_HUE_MIN = 35
-const AMBER_HUE_MAX = 50
+export interface VerifyResult {
+  slug: string
+  state: string
+  mockup_url: string | null
+  page_status: number
+  image_url: string | null
+  image_status: number | null
+  image_content_type: string | null
+  image_size: number | null
+  ok: boolean
+  reason?: string
+}
 
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  r /= 255; g /= 255; b /= 255
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  const l = (max + min) / 2
-  let h = 0, s = 0
+function parseArgs(): { slug?: string } {
+  const args: Record<string, string> = {}
+  for (const arg of process.argv.slice(2)) {
+    const m = arg.match(/^--(\w[\w-]*)=(.+)$/)
+    if (m) args[m[1]] = m[2]
+  }
+  return args
+}
 
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break
-      case g: h = ((b - r) / d + 2) / 6; break
-      case b: h = ((r - g) / d + 4) / 6; break
-    }
+export async function verifyOne(slug: string, state: string, mockupUrl: string | null): Promise<VerifyResult> {
+  const result: VerifyResult = {
+    slug, state, mockup_url: mockupUrl,
+    page_status: 0, image_url: null, image_status: null,
+    image_content_type: null, image_size: null,
+    ok: false,
   }
 
-  return [h * 360, s, l]
+  try {
+    // 1. Fetch the personalized page
+    const pageRes = await fetch(`${BASE_URL}/for/${slug}`, { signal: AbortSignal.timeout(15000) })
+    result.page_status = pageRes.status
+    if (!pageRes.ok) {
+      result.reason = `page status ${pageRes.status}`
+      return result
+    }
+    const html = await pageRes.text()
+
+    // 2. Find the mockup image src
+    // Next.js <Image> component transforms <img src="/mockups/foo.webp" unoptimized />
+    // into plain <img src="/mockups/foo.webp" ...>. Look for /mockups/{slug}.webp OR
+    // the _next/image optimized URL wrapping it.
+    const patterns: RegExp[] = [
+      /src=["']([^"']*\/mockups\/[^"']+\.webp[^"']*)["']/i,
+      /src=["'](\/_next\/image\?url=[^"']*mockups[^"']+)["']/i,
+    ]
+    let imageUrl: string | null = null
+    for (const re of patterns) {
+      const m = html.match(re)
+      if (m) { imageUrl = m[1].replace(/&amp;/g, '&'); break }
+    }
+
+    if (!imageUrl) {
+      result.reason = 'no mockup <img> tag found in HTML'
+      return result
+    }
+    if (imageUrl.startsWith('/')) imageUrl = BASE_URL + imageUrl
+    result.image_url = imageUrl
+
+    // 3. Fetch the image
+    const imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) })
+    result.image_status = imgRes.status
+    result.image_content_type = imgRes.headers.get('content-type')
+
+    if (!imgRes.ok) {
+      result.reason = `image status ${imgRes.status}`
+      return result
+    }
+
+    const buffer = Buffer.from(await imgRes.arrayBuffer())
+    result.image_size = buffer.length
+
+    // 4. Content-type validation
+    if (!result.image_content_type?.startsWith('image/')) {
+      result.reason = `non-image content-type: ${result.image_content_type}`
+      return result
+    }
+
+    // 5. Size validation
+    if (buffer.length < MIN_IMAGE_BYTES) {
+      result.reason = `image too small: ${buffer.length}B < ${MIN_IMAGE_BYTES}B`
+      return result
+    }
+
+    result.ok = true
+    return result
+  } catch (err) {
+    result.reason = `fetch error: ${(err as Error).message?.slice(0, 80)}`
+    return result
+  }
+}
+
+async function writeVerificationEvent(prospectId: string, result: VerifyResult): Promise<void> {
+  try {
+    const sb = getSupabaseServer()
+    if (!sb) return
+    await sb.from('prospect_events').insert({
+      prospect_id: prospectId,
+      event: result.ok ? 'mockup_verified' : 'mockup_broken',
+      payload: {
+        url: result.image_url,
+        page_status: result.page_status,
+        image_status: result.image_status,
+        content_type: result.image_content_type,
+        size: result.image_size,
+        reason: result.reason,
+        base_url: BASE_URL,
+      },
+    })
+  } catch (err) {
+    console.error('[verify] Failed to write event:', err)
+  }
 }
 
 async function main() {
-  if (!existsSync(MOCKUP_DIR)) {
-    console.error(`Mockup directory not found: ${MOCKUP_DIR}`)
+  const args = parseArgs()
+  const sb = getSupabaseServer()
+  if (!sb) {
+    console.error('No Supabase — set NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SECRET_KEY')
     process.exit(1)
   }
 
-  const files = readdirSync(MOCKUP_DIR).filter(f => f.endsWith('.webp'))
-  if (files.length === 0) {
-    console.error('No .webp files found in mockup directory')
+  let q = sb.from('prospects').select('id, slug, pipeline_state, mockup_url').in('pipeline_state', VERIFIABLE_STATES)
+  if (args.slug) q = q.eq('slug', args.slug)
+  const { data: prospects } = await q.order('pipeline_state')
+
+  if (!prospects || prospects.length === 0) {
+    console.log('No mockup_ready+ prospects found.')
+    process.exit(0)
+  }
+
+  console.log(`\nVerifying ${prospects.length} prospect(s) against ${BASE_URL}...\n`)
+
+  const results: (VerifyResult & { id: string })[] = []
+  for (const p of prospects) {
+    const r = await verifyOne(p.slug!, p.pipeline_state!, p.mockup_url)
+    results.push({ ...r, id: p.id })
+    await writeVerificationEvent(p.id, r)
+    const icon = r.ok ? '✅' : '❌'
+    const detail = r.ok
+      ? `${((r.image_size || 0) / 1024).toFixed(0)}KB ${r.image_content_type}`
+      : r.reason || 'unknown'
+    console.log(`${icon}  ${p.slug!.padEnd(55)} [${p.pipeline_state}]  ${detail}`)
+  }
+
+  const broken = results.filter(r => !r.ok)
+  console.log('\n' + '─'.repeat(80))
+  console.log(`Result: ${results.length - broken.length}/${results.length} passed${broken.length > 0 ? `, ${broken.length} BROKEN` : ''}`)
+
+  if (broken.length > 0) {
+    console.log('\nBroken prospects:')
+    for (const b of broken) console.log(`  ❌ ${b.slug} — ${b.reason}`)
     process.exit(1)
   }
-
-  console.log(`\nVerifying ${files.length} mockup(s) in ${MOCKUP_DIR}\n`)
-
-  let allPassed = true
-
-  for (const file of files) {
-    const filePath = resolve(MOCKUP_DIR, file)
-    console.log(`--- ${file} ---`)
-
-    const fileStat = statSync(filePath)
-    const sizeKB = fileStat.size / 1024
-
-    // Dimension check
-    const meta = await sharp(filePath).metadata()
-    const dimOk = meta.width === EXPECTED_W && meta.height === EXPECTED_H
-    if (dimOk) {
-      console.log(`  \u2705 Dimensions: ${meta.width}x${meta.height}`)
-    } else {
-      console.log(`  \u274C Dimensions: ${meta.width}x${meta.height} (expected ${EXPECTED_W}x${EXPECTED_H})`)
-      allPassed = false
-    }
-
-    // File size check
-    const sizeOk = sizeKB >= MIN_SIZE_KB && sizeKB <= MAX_SIZE_KB
-    if (sizeOk) {
-      console.log(`  \u2705 File size: ${sizeKB.toFixed(1)} KB`)
-    } else {
-      console.log(`  \u274C File size: ${sizeKB.toFixed(1)} KB (expected ${MIN_SIZE_KB}-${MAX_SIZE_KB} KB)`)
-      allPassed = false
-    }
-
-    // Amber pixel check: sample raw pixels and look for amber hue
-    const { data } = await sharp(filePath)
-      .raw()
-      .ensureAlpha()
-      .toBuffer({ resolveWithObject: true })
-
-    let amberCount = 0
-    const totalPixels = (meta.width || 1) * (meta.height || 1)
-    // Sample every 100th pixel for speed
-    for (let i = 0; i < data.length; i += 400) {
-      const r = data[i], g = data[i + 1], b = data[i + 2]
-      const [hue, sat, lum] = rgbToHsl(r, g, b)
-      if (hue >= AMBER_HUE_MIN && hue <= AMBER_HUE_MAX && sat > 0.3 && lum > 0.15 && lum < 0.85) {
-        amberCount++
-      }
-    }
-
-    const sampledPixels = Math.floor(data.length / 400)
-    const amberRatio = amberCount / sampledPixels
-
-    if (amberCount > 0) {
-      console.log(`  \u2705 Amber pixels: found ${amberCount}/${sampledPixels} sampled (${(amberRatio * 100).toFixed(2)}%)`)
-    } else {
-      console.log(`  \u274C Amber pixels: none detected in ${sampledPixels} sampled pixels`)
-      allPassed = false
-    }
-  }
-
-  // Copy to review directory
-  console.log(`\n--- Copying to review directory ---`)
-  if (!existsSync(REVIEW_DIR)) mkdirSync(REVIEW_DIR, { recursive: true })
-
-  for (const file of files) {
-    const src = resolve(MOCKUP_DIR, file)
-    const dst = resolve(REVIEW_DIR, file)
-    copyFileSync(src, dst)
-  }
-
-  const reviewFiles = readdirSync(REVIEW_DIR)
-  console.log(`\nFiles in ${REVIEW_DIR}:`)
-  for (const f of reviewFiles) {
-    console.log(`  ${f}`)
-  }
-
-  console.log(`\n${allPassed ? '\u2705 All checks passed' : '\u274C Some checks failed'}`)
+  process.exit(0)
 }
 
-main().catch(err => {
-  console.error('verify-mockups failed:', err)
-  process.exit(1)
-})
+// Only run main() if invoked directly (not when imported for unit tests)
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Verification failed:', err)
+    process.exit(2)
+  })
+}

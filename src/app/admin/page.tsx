@@ -1,12 +1,13 @@
 import {
   getFunnelCounts, getProspects, getMetricsTotals,
-  getCostBreakdown, getRecentEvents, getNiches,
+  getCostBreakdown, getRecentEvents, getNiches, getBrokenMockups,
 } from '@/lib/admin/queries'
 import { MetricCard } from '@/components/admin/MetricCard'
 import { FunnelChart } from '@/components/admin/FunnelChart'
 import { ProspectTable } from '@/components/admin/ProspectTable'
 import { CostChart } from '@/components/admin/CostChart'
 import { ActivityFeed } from '@/components/admin/ActivityFeed'
+import { HealthBanner } from '@/components/admin/HealthBanner'
 
 export default async function AdminDashboard({
   searchParams,
@@ -16,19 +17,23 @@ export default async function AdminDashboard({
   const sp = await searchParams
   const nicheFilter = sp.niche
 
-  const [metrics, funnel, prospects, costs, events, niches] = await Promise.all([
+  const [metrics, funnel, prospects, costs, events, niches, broken] = await Promise.all([
     getMetricsTotals(),
     getFunnelCounts(),
     getProspects(nicheFilter ? { niche: nicheFilter } : {}),
     getCostBreakdown(8),
     getRecentEvents(20),
     getNiches(),
+    getBrokenMockups(),
   ])
 
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 
   return (
     <div className="space-y-6">
+      {/* Health banner (only renders if broken mockups exist) */}
+      <HealthBanner broken={broken} />
+
       {/* Metrics row */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <MetricCard

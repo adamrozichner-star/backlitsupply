@@ -6,6 +6,7 @@ import { StateBadge } from '@/components/admin/StateBadge'
 import { EventTimeline } from '@/components/admin/EventTimeline'
 import { StateActions } from '@/components/admin/StateActions'
 import { NoteForm } from '@/components/admin/NoteForm'
+import { VerifyMockupButton } from '@/components/admin/VerifyMockupButton'
 import { ArrowLeft, ArrowSquareOut } from '@phosphor-icons/react/dist/ssr'
 
 export default async function ProspectDetailPage({
@@ -79,6 +80,9 @@ export default async function ProspectDetailPage({
               No mockup yet
             </div>
           )}
+
+          {/* Verify mockup button — only show if there's a mockup to verify */}
+          {prospect.mockup_url && <VerifyMockupButton prospectId={prospect.id} />}
 
           {/* Details */}
           <div className="border border-white/[0.06] bg-[#111] p-4 sm:p-5">

@@ -388,6 +388,70 @@ export async function getMetricsByNiche(): Promise<NicheMetrics[]> {
   return [...byNiche.values()].sort((a, b) => b.total - a.total)
 }
 
+// ─── Mockup health check (for admin banner) ─────────────
+
+export interface BrokenMockup {
+  id: string
+  slug: string | null
+  business_name: string | null
+  reason: string | null
+  last_broken_at: string
+}
+
+/**
+ * Returns prospects that have a mockup_broken event newer than their most
+ * recent mockup_verified event (and are still at mockup_ready+). Used by the
+ * admin dashboard health banner.
+ */
+export async function getBrokenMockups(): Promise<BrokenMockup[]> {
+  const sb = getSupabaseServer()
+  if (!sb) return []
+
+  // Pull last 24h of mockup_broken + mockup_verified events
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data: events } = await sb
+    .from('prospect_events')
+    .select('prospect_id, event, payload, created_at')
+    .in('event', ['mockup_broken', 'mockup_verified'])
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+
+  if (!events || events.length === 0) return []
+
+  // Keep only the LATEST event per prospect
+  const latestByProspect = new Map<string, typeof events[0]>()
+  for (const e of events) {
+    if (!latestByProspect.has(e.prospect_id)) latestByProspect.set(e.prospect_id, e)
+  }
+
+  const broken = [...latestByProspect.values()].filter(e => e.event === 'mockup_broken')
+  if (broken.length === 0) return []
+
+  // Join with prospects, filter to mockup_ready+ only
+  const ids = broken.map(b => b.prospect_id)
+  const { data: prospects } = await sb
+    .from('prospects')
+    .select('id, slug, business_name, pipeline_state')
+    .in('id', ids)
+    .in('pipeline_state', ['mockup_ready', 'sent', 'opened', 'replied', 'positive', 'booked'])
+
+  const prospectMap = new Map((prospects || []).map(p => [p.id, p]))
+
+  return broken
+    .map(b => {
+      const p = prospectMap.get(b.prospect_id)
+      if (!p) return null
+      return {
+        id: p.id,
+        slug: p.slug,
+        business_name: p.business_name,
+        reason: ((b.payload as Record<string, unknown>)?.reason as string) || null,
+        last_broken_at: b.created_at,
+      }
+    })
+    .filter((r): r is BrokenMockup => r !== null)
+}
+
 export async function getNiches(): Promise<string[]> {
   const sb = getSupabaseServer()
   if (!sb) return []

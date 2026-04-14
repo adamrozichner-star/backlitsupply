@@ -179,6 +179,8 @@ async function main() {
 
   let successCount = 0
   const stats = { discovered: 0, enriched: 0, qualified: 0, mockup_gated: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0 }
+  // Track prospect IDs that reached mockup_ready in THIS run (for end-of-pipeline verification)
+  const newlyMockupReady: { id: string; slug: string }[] = []
 
   for (const geo of geos) {
     console.log(`\n── Geo: ${geo.city}, ${geo.state} ──`)
@@ -461,6 +463,7 @@ async function main() {
 
           await updatePipelineState(existingId, 'mockup_ready', { mockup_url: mockupUrl })
           console.log(`    [state] qualified → mockup_ready`)
+          newlyMockupReady.push({ id: existingId, slug })
         }
 
         // Generate outreach copy — only if we have a real email
@@ -521,6 +524,55 @@ async function main() {
   console.log(`  Skipped (done): ${stats.skipped_done}`)
   console.log(`  Resumed: ${stats.resumed}`)
   console.log(`  CSV: ${csvPath}`)
+
+  // ── Mockup verification tail ──
+  // Confirm every prospect that reached mockup_ready in this run actually has
+  // a renderable image in production. If not, downgrade to qualified and log
+  // mockup_gate_failed. This catches the .gitignore deploy gap + any future
+  // silent storage failures BEFORE outreach is sent.
+  if (!dryRun && newlyMockupReady.length > 0 && supabase) {
+    const { verifyOne } = await import('./verify-mockups')
+    console.log(`\n── Verifying ${newlyMockupReady.length} new mockups against production ──`)
+    const broken: string[] = []
+    for (const { id, slug } of newlyMockupReady) {
+      const r = await verifyOne(slug, 'mockup_ready', null)
+      if (r.ok) {
+        console.log(`  ✅ ${slug}`)
+        await supabase.from('prospect_events').insert({
+          prospect_id: id,
+          event: 'mockup_verified',
+          payload: { url: r.image_url, size: r.image_size, content_type: r.image_content_type },
+        })
+      } else {
+        console.log(`  ❌ ${slug} — ${r.reason}`)
+        broken.push(slug)
+        // Downgrade back to qualified
+        await supabase.from('prospects').update({ pipeline_state: 'qualified' }).eq('id', id)
+        await supabase.from('prospect_events').insert({
+          prospect_id: id,
+          event: 'mockup_broken',
+          payload: { url: r.image_url, reason: r.reason, downgraded_to: 'qualified' },
+        })
+        await supabase.from('prospect_events').insert({
+          prospect_id: id,
+          event: 'mockup_gate_failed',
+          payload: { reason: 'render_verification_failed', detail: r.reason },
+        })
+      }
+    }
+
+    if (broken.length > 0) {
+      console.log('\n')
+      console.log('╔══════════════════════════════════════════════════════════════════╗')
+      console.log('║ ⚠  MOCKUP VERIFICATION FAILED                                    ║')
+      console.log(`║    ${String(broken.length).padStart(2)} prospect(s) downgraded from mockup_ready → qualified.      ║`)
+      console.log('║    Likely cause: mockup webp not deployed to production.         ║')
+      console.log('║    Fix: git add -f public/mockups/*.webp && git push             ║')
+      console.log('║    Then re-run pipeline to re-advance state.                     ║')
+      console.log('╚══════════════════════════════════════════════════════════════════╝')
+      process.exit(1)
+    }
+  }
 }
 
 main().catch(err => {

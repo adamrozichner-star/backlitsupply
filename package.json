@@ -10,6 +10,7 @@
     "seed-prospect": "tsx scripts/seed-prospect.ts",
     "pipeline": "tsx scripts/run-pipeline.ts",
     "batch": "tsx scripts/run-batch.ts",
+    "verify": "tsx scripts/verify-mockups.ts",
     "loop": "tsx scripts/run-loop.ts",
     "test:pipeline": "tsx scripts/test-pipeline.ts"
   },
