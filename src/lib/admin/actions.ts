@@ -99,7 +99,7 @@ export async function verifyProspectMockup(prospectId: string): Promise<ActionRe
 
     if (!p || !p.slug) return { ok: false, error: 'Prospect not found' }
 
-    const { verifyOne } = await import('../../../scripts/verify-mockups')
+    const { verifyOne } = await import('../mockup-verification')
     const result = await verifyOne(p.slug, p.pipeline_state!, p.mockup_url)
 
     await sb.from('prospect_events').insert({
