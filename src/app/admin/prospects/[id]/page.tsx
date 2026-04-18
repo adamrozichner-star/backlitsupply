@@ -91,6 +91,9 @@ export default async function ProspectDetailPage({
               <Row label="Slug" value={prospect.slug} />
               <Row label="Website" value={prospect.website} link={prospect.website || undefined} />
               <Row label="Email" value={prospect.email} link={prospect.email ? `mailto:${prospect.email}` : undefined} />
+              {prospect.email_source && (
+                <Row label="Email source" value={`${prospect.email_source}${prospect.email_confidence ? ` (${prospect.email_confidence}%)` : ''}${prospect.email_is_role_based ? ' · role-based' : ''}`} />
+              )}
               <Row label="Phone" value={prospect.phone} />
               <Row label="Source" value={prospect.source} />
               <Row label="Enrichment v" value={prospect.enrichment_version?.toString() || '—'} />

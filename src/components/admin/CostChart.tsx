@@ -3,7 +3,7 @@ import type { CostBreakdownWeek } from '@/lib/admin/queries'
 export function CostChart({
   weeks, firstCostDate,
 }: { weeks: CostBreakdownWeek[]; firstCostDate: string | null }) {
-  const totals = weeks.map(w => w.places + w.haiku + w.replicate)
+  const totals = weeks.map(w => w.places + w.haiku + w.replicate + w.hunter)
   const maxTotal = Math.max(...totals, 0.01)
   const grandTotal = totals.reduce((sum, t) => sum + t, 0)
 
@@ -23,12 +23,13 @@ export function CostChart({
       ) : (
         <div className="flex h-40 items-end gap-1 sm:gap-2">
           {weeks.map(w => {
-            const total = w.places + w.haiku + w.replicate
+            const total = w.places + w.haiku + w.replicate + w.hunter
             const heightPct = (total / maxTotal) * 100
             const placesPct = total > 0 ? (w.places / total) * heightPct : 0
             const haikuPct = total > 0 ? (w.haiku / total) * heightPct : 0
             const replicatePct = total > 0 ? (w.replicate / total) * heightPct : 0
-            const label = w.week_start.slice(5)  // MM-DD
+            const hunterPct = total > 0 ? (w.hunter / total) * heightPct : 0
+            const label = w.week_start.slice(5)
 
             return (
               <div key={w.week_start} className="group flex flex-1 flex-col items-center gap-1">
@@ -36,6 +37,7 @@ export function CostChart({
                   <div className="w-full bg-cyan-500/50" style={{ height: `${placesPct}%` }} title={`Places $${w.places.toFixed(3)}`} />
                   <div className="w-full bg-amber-500/50" style={{ height: `${haikuPct}%` }} title={`Haiku $${w.haiku.toFixed(3)}`} />
                   <div className="w-full bg-pink-500/50" style={{ height: `${replicatePct}%` }} title={`Replicate $${w.replicate.toFixed(3)}`} />
+                  <div className="w-full bg-green-500/50" style={{ height: `${hunterPct}%` }} title={`Hunter $${w.hunter.toFixed(3)}`} />
                 </div>
                 <p className="text-[9px] tabular-nums text-white/30">{label}</p>
               </div>
@@ -48,6 +50,7 @@ export function CostChart({
         <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-cyan-500/50" />Places</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-amber-500/50" />Haiku</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-pink-500/50" />Replicate</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-green-500/50" />Hunter</span>
       </div>
 
       {firstCostDate ? (

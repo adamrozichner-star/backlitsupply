@@ -22,6 +22,9 @@ export interface AdminProspect {
   owner_first_name: string | null
   owner_last_name: string | null
   email: string | null
+  email_source: string | null
+  email_confidence: number | null
+  email_is_role_based: boolean | null
   phone: string | null
   website: string | null
   city: string | null
@@ -66,6 +69,7 @@ export interface CostBreakdownWeek {
   places: number
   haiku: number
   replicate: number
+  hunter: number
 }
 
 export interface NicheMetrics {
@@ -286,20 +290,21 @@ export async function getCostBreakdown(weeks = 8): Promise<CostBreakdownWeek[]> 
     d.setUTCDate(d.getUTCDate() - i * 7)
     const wk = weekStart(d.toISOString())
     if (!bucketMap.has(wk)) {
-      bucketMap.set(wk, { week_start: wk, places: 0, haiku: 0, replicate: 0 })
+      bucketMap.set(wk, { week_start: wk, places: 0, haiku: 0, replicate: 0, hunter: 0 })
     }
   }
 
   for (const row of data) {
     const wk = weekStart(row.created_at)
     if (!bucketMap.has(wk)) {
-      bucketMap.set(wk, { week_start: wk, places: 0, haiku: 0, replicate: 0 })
+      bucketMap.set(wk, { week_start: wk, places: 0, haiku: 0, replicate: 0, hunter: 0 })
     }
     const bucket = bucketMap.get(wk)!
     const usd = (row.payload as { usd?: number })?.usd || 0
     if (row.event === 'cost:places') bucket.places += usd
     else if (row.event === 'cost:haiku') bucket.haiku += usd
     else if (row.event === 'cost:replicate') bucket.replicate += usd
+    else if (row.event === 'cost:hunter') bucket.hunter += usd
   }
 
   return [...bucketMap.values()].sort((a, b) => a.week_start.localeCompare(b.week_start))
