@@ -438,10 +438,11 @@ async function main() {
             await recordEvent(existingId, 'mockup_generated', {
               model: result.model,
               cost_usd: result.cost_usd,
+              prediction_id: result.prediction_id,
             })
             // Cost event for Replicate (0 when SharpCompositor fallback)
             if (result.cost_usd > 0) {
-              await recordCost('replicate', result.cost_usd, { model: result.model, prospect_id: existingId })
+              await recordCost('replicate', result.cost_usd, { model: result.model, prediction_id: result.prediction_id, prospect_id: existingId })
             }
           }
         } catch (err) {

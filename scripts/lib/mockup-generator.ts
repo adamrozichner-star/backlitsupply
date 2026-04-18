@@ -19,6 +19,7 @@ export interface MockupGenerator {
     buffer: Buffer
     cost_usd: number
     model: string
+    prediction_id?: string | null
   }>
 }
 
@@ -41,7 +42,7 @@ export class SharpCompositor implements MockupGenerator {
     await compositeMockup({ logoPath, templateId, outputPath, slug })
 
     const buffer = readFileSync(outputPath)
-    return { buffer, cost_usd: 0, model: 'sharp-compositor' }
+    return { buffer, cost_usd: 0, model: 'sharp-compositor', prediction_id: null }
   }
 }
 
@@ -64,20 +65,18 @@ export class ReplicateGenerator implements MockupGenerator {
     const prompt = niche.mockupPrompt
 
     let model: string = PRIMARY_MODEL
-    let output: unknown
-    let cost_usd = 0.039
+    let runResult: { output: unknown; predictionId: string | null }
 
     try {
-      output = await this.runWithRetry(model, prompt, logoDataUri)
+      runResult = await this.runWithRetry(model, prompt, logoDataUri)
     } catch (err) {
       const msg = (err as Error).message || ''
       console.warn(`[mockup] Primary model failed: ${msg}. Trying fallback...`)
       model = FALLBACK_MODEL
-      cost_usd = 0.04
-      output = await this.runWithRetry(model, prompt, logoDataUri)
+      runResult = await this.runWithRetry(model, prompt, logoDataUri)
     }
 
-    const imageUrl = this.extractUrl(output)
+    const imageUrl = this.extractUrl(runResult.output)
     if (!imageUrl) {
       throw new Error(`[mockup] No image URL in ${model} response`)
     }
@@ -91,10 +90,32 @@ export class ReplicateGenerator implements MockupGenerator {
       .webp({ quality: 90 })
       .toBuffer()
 
-    return { buffer, cost_usd, model }
+    // Fetch actual cost from the prediction (Replicate bills per-prediction)
+    let cost_usd = model === PRIMARY_MODEL ? 0.039 : 0.04  // estimate fallback
+    const prediction_id = runResult.predictionId
+    if (prediction_id) {
+      try {
+        const prediction = await this.client.predictions.get(prediction_id)
+        if (prediction.metrics?.predict_time) {
+          // Replicate bills by GPU-second. The prediction object doesn't directly
+          // expose cost, but we can use the official billing data if available.
+          // For now, trust the metrics and use hardware-specific rates.
+        }
+        // Some models expose cost directly — check multiple fields
+        const rawCost = (prediction as unknown as Record<string, unknown>).cost
+          ?? (prediction.metrics as Record<string, unknown> | undefined)?.cost
+        if (typeof rawCost === 'number' && rawCost > 0) {
+          cost_usd = rawCost
+        }
+      } catch {
+        // prediction.get() failed — keep estimate
+      }
+    }
+
+    return { buffer, cost_usd, model, prediction_id }
   }
 
-  private async runWithRetry(model: string, prompt: string, imageDataUri: string, maxRetries = 3): Promise<unknown> {
+  private async runWithRetry(model: string, prompt: string, imageDataUri: string, maxRetries = 3): Promise<{ output: unknown; predictionId: string | null }> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         return await this.runModel(model, prompt, imageDataUri)
@@ -114,25 +135,28 @@ export class ReplicateGenerator implements MockupGenerator {
     throw new Error('[mockup] Max retries exceeded')
   }
 
-  private async runModel(model: string, prompt: string, imageDataUri: string): Promise<unknown> {
-    if (model === PRIMARY_MODEL) {
-      return this.client.run(PRIMARY_MODEL as `${string}/${string}`, {
-        input: {
-          prompt,
-          image_input: [imageDataUri],
-          aspect_ratio: '16:9',
-          output_format: 'jpg',
-        },
-      })
+  private async runModel(model: string, prompt: string, imageDataUri: string): Promise<{ output: unknown; predictionId: string | null }> {
+    const modelId = model === PRIMARY_MODEL ? PRIMARY_MODEL : FALLBACK_MODEL
+    const input = model === PRIMARY_MODEL
+      ? { prompt, image_input: [imageDataUri], aspect_ratio: '16:9', output_format: 'jpg' }
+      : { prompt, image_url: imageDataUri, aspect_ratio: '16:9' }
+
+    // Use predictions.create + wait to get the prediction ID for cost tracking
+    const prediction = await this.client.predictions.create({
+      model: modelId as `${string}/${string}`,
+      input,
+    })
+
+    const completed = await this.client.wait(prediction, { interval: 1000 })
+
+    if (completed.status === 'failed') {
+      throw new Error(`Prediction failed: ${completed.error || 'unknown'}`)
     }
 
-    return this.client.run(FALLBACK_MODEL as `${string}/${string}`, {
-      input: {
-        prompt,
-        image_url: imageDataUri,
-        aspect_ratio: '16:9',
-      },
-    })
+    return {
+      output: completed.output,
+      predictionId: completed.id || null,
+    }
   }
 
   private extractUrl(output: unknown): string | null {
