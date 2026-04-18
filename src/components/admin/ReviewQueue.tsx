@@ -17,14 +17,12 @@ const REJECT_REASONS: { value: RejectReason; label: string; shortcut: string }[]
 export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] }) {
   const [items, setItems] = useState(initialItems)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [showRejectDropdown, setShowRejectDropdown] = useState(false)
   const [pending, startTransition] = useTransition()
 
   const current = items[currentIndex] || null
   const remaining = items.length - currentIndex
 
   function advance() {
-    setShowRejectDropdown(false)
     setCurrentIndex(i => Math.min(i + 1, items.length))
   }
 
@@ -43,7 +41,6 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
 
   const handleReject = useCallback((reason: RejectReason) => {
     if (!current || pending) return
-    setShowRejectDropdown(false)
     startTransition(async () => {
       const result = await rejectProspectMockup(current.id, reason)
       const isTerminal = reason === 'hallucinated_logo' || reason === 'low_quality_source'
@@ -67,24 +64,20 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
       if (e.key === 'a' || e.key === 'A') {
         e.preventDefault()
         handleApprove()
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault()
-        setShowRejectDropdown(prev => !prev)
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
         advance()
-      } else if (showRejectDropdown && /^[1-4]$/.test(e.key)) {
+      } else if (/^[1-4]$/.test(e.key)) {
+        // Direct single-key reject: 1=hallucinated, 2=composition, 3=source, 4=other
         e.preventDefault()
         const reason = REJECT_REASONS[parseInt(e.key, 10) - 1]
         if (reason) handleReject(reason.value)
-      } else if (e.key === 'Escape') {
-        setShowRejectDropdown(false)
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [current, showRejectDropdown, handleApprove, handleReject])
+  }, [current, handleApprove, handleReject])
 
   // ── Empty state ──
   if (!current) {
@@ -165,7 +158,7 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
         </div>
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons — single-key driven */}
       <div className="border border-white/[0.06] bg-[#111] p-4">
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -175,17 +168,20 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
           >
             {pending ? '...' : 'Approve (A)'}
           </button>
-          <button
-            onClick={() => setShowRejectDropdown(!showRejectDropdown)}
-            disabled={pending}
-            className="border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
-          >
-            {pending ? '...' : 'Reject / Lost (R)'}
-          </button>
+          {REJECT_REASONS.map(r => (
+            <button
+              key={r.value}
+              onClick={() => handleReject(r.value)}
+              disabled={pending}
+              className="border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {pending ? '...' : <><span className="font-semibold text-red-200">{r.shortcut}</span> {r.label.split('(')[0].trim()}</>}
+            </button>
+          ))}
           <button
             onClick={() => advance()}
             disabled={pending}
-            className="border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 disabled:opacity-50"
+            className="border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 disabled:opacity-50"
           >
             Skip (→)
           </button>
@@ -196,30 +192,11 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
             Detail →
           </Link>
         </div>
-
-        {showRejectDropdown && (
-          <div className="mt-3 space-y-1 border border-white/[0.06] bg-black/40 p-3">
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/40">
-              Select rejection reason:
-            </p>
-            {REJECT_REASONS.map(r => (
-              <button
-                key={r.value}
-                onClick={() => handleReject(r.value)}
-                disabled={pending}
-                className="block w-full px-3 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
-              >
-                <span className="mr-2 text-amber-500">{r.shortcut}</span>{r.label}
-              </button>
-            ))}
-            <p className="mt-2 text-[10px] text-white/20">Press 1-4 to select, Esc to cancel</p>
-          </div>
-        )}
       </div>
 
       {/* Keyboard hint */}
       <p className="text-center text-[10px] text-white/20">
-        A = approve · R = reject menu · 1-4 = reason · → = skip · Esc = close menu
+        A = approve · 1 = hallucinated · 2 = composition · 3 = source quality · 4 = other · → = skip
       </p>
     </div>
   )
