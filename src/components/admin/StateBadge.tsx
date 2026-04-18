@@ -4,6 +4,7 @@ const COLORS: Record<PipelineState, string> = {
   discovered: 'bg-white/5 text-white/50 border-white/10',
   enriched: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
   qualified: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20',
+  mockup_review_pending: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   mockup_ready: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   sent: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
   opened: 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/20',

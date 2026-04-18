@@ -6,11 +6,11 @@
 import { getSupabaseServer } from '@/lib/supabase/server'
 
 export type PipelineState =
-  | 'discovered' | 'enriched' | 'qualified' | 'mockup_ready'
+  | 'discovered' | 'enriched' | 'qualified' | 'mockup_review_pending' | 'mockup_ready'
   | 'sent' | 'opened' | 'replied' | 'positive' | 'booked' | 'won' | 'lost' | 'dead'
 
 export const PIPELINE_STATES: PipelineState[] = [
-  'discovered', 'enriched', 'qualified', 'mockup_ready',
+  'discovered', 'enriched', 'qualified', 'mockup_review_pending', 'mockup_ready',
   'sent', 'opened', 'replied', 'positive', 'booked', 'won',
   'lost', 'dead',
 ]
@@ -74,6 +74,7 @@ export interface NicheMetrics {
   discovered: number
   enriched: number
   qualified: number
+  mockup_review_pending: number
   mockup_ready: number
   sent: number
   opened: number
@@ -214,7 +215,7 @@ export async function getMetricsTotals(): Promise<MetricsTotals> {
 
   const { count: qualifiedCount } = await sb
     .from('prospects').select('*', { count: 'exact', head: true })
-    .in('pipeline_state', ['qualified', 'mockup_ready', 'sent', 'opened', 'replied', 'positive', 'booked', 'won'])
+    .in('pipeline_state', ['qualified', 'mockup_review_pending', 'mockup_ready', 'sent', 'opened', 'replied', 'positive', 'booked', 'won'])
 
   const { count: sentCount } = await sb
     .from('prospects').select('*', { count: 'exact', head: true })
@@ -353,7 +354,7 @@ export async function getMetricsByNiche(): Promise<NicheMetrics[]> {
       m = {
         niche,
         total: 0,
-        discovered: 0, enriched: 0, qualified: 0, mockup_ready: 0,
+        discovered: 0, enriched: 0, qualified: 0, mockup_review_pending: 0, mockup_ready: 0,
         sent: 0, opened: 0, replied: 0, positive: 0, booked: 0, won: 0, lost: 0,
         sendable: 0,
         mockup_hit_rate: 0,
@@ -380,7 +381,7 @@ export async function getMetricsByNiche(): Promise<NicheMetrics[]> {
   // Compute hit rate: mockup_ready+ / (qualified + mockup_ready+)
   // (prospects that reached the mockup stage, out of those that got past qualify)
   for (const m of byNiche.values()) {
-    const reachedMockup = m.mockup_ready + m.sent + m.opened + m.replied + m.positive + m.booked + m.won
+    const reachedMockup = m.mockup_review_pending + m.mockup_ready + m.sent + m.opened + m.replied + m.positive + m.booked + m.won
     const pastQualify = m.qualified + reachedMockup + m.lost
     m.mockup_hit_rate = pastQualify > 0 ? reachedMockup / pastQualify : 0
   }
@@ -403,6 +404,45 @@ export interface BrokenMockup {
  * recent mockup_verified event (and are still at mockup_ready+). Used by the
  * admin dashboard health banner.
  */
+// ─── Review queue ───────────────────────────────────────
+
+export interface ReviewQueueItem {
+  id: string
+  slug: string
+  business_name: string
+  owner_first_name: string | null
+  niche: string | null
+  city: string | null
+  state: string | null
+  logo_url: string | null
+  mockup_url: string | null
+  mockup_retry_count: number
+  created_at: string
+}
+
+export async function getReviewQueue(): Promise<ReviewQueueItem[]> {
+  const sb = getSupabaseServer()
+  if (!sb) return []
+  const { data } = await sb
+    .from('prospects')
+    .select('id, slug, business_name, owner_first_name, niche, city, state, logo_url, mockup_url, mockup_retry_count, created_at')
+    .eq('pipeline_state', 'mockup_review_pending')
+    .order('created_at', { ascending: true })
+  return (data || []) as ReviewQueueItem[]
+}
+
+export async function getReviewQueueCount(): Promise<number> {
+  const sb = getSupabaseServer()
+  if (!sb) return 0
+  const { count } = await sb
+    .from('prospects')
+    .select('*', { count: 'exact', head: true })
+    .eq('pipeline_state', 'mockup_review_pending')
+  return count || 0
+}
+
+// ─── Broken mockups ─────────────────────────────────────
+
 export async function getBrokenMockups(): Promise<BrokenMockup[]> {
   const sb = getSupabaseServer()
   if (!sb) return []

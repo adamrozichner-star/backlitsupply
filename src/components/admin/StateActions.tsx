@@ -1,16 +1,17 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import type { PipelineState } from '@/lib/admin/queries'
 import { StateBadge } from './StateBadge'
-import { updateProspectState } from '@/lib/admin/actions'
+import { updateProspectState, approveProspectMockup, rejectProspectMockup, type RejectReason } from '@/lib/admin/actions'
 
 // State machine: what transitions are available from each state
 const ACTIONS: Record<PipelineState, Array<{ label: string; to: PipelineState; variant: 'primary' | 'danger' | 'ghost' }>> = {
   discovered: [],
   enriched: [],
   qualified: [],
+  mockup_review_pending: [], // handled separately below
   mockup_ready: [
     { label: 'Mark as Sent', to: 'sent', variant: 'primary' },
     { label: 'Mark as Lost', to: 'lost', variant: 'danger' },
@@ -51,6 +52,13 @@ const VARIANT_CLS: Record<'primary' | 'danger' | 'ghost', string> = {
   ghost: 'border border-white/10 bg-white/5 text-white/70 hover:bg-white/10',
 }
 
+const REJECT_REASONS: { value: RejectReason; label: string }[] = [
+  { value: 'hallucinated_logo', label: 'Hallucinated logo (terminal → lost)' },
+  { value: 'wrong_composition', label: 'Wrong composition (retry once)' },
+  { value: 'low_quality_source', label: 'Low quality source (terminal → lost)' },
+  { value: 'other', label: 'Other (retry once)' },
+]
+
 export function StateActions({
   prospectId,
   currentState,
@@ -61,17 +69,41 @@ export function StateActions({
   daysInState: number
 }) {
   const [pending, startTransition] = useTransition()
+  const [showRejectDropdown, setShowRejectDropdown] = useState(false)
   const actions = ACTIONS[currentState] || []
+  const isReviewPending = currentState === 'mockup_review_pending'
 
   function handleAction(to: PipelineState, label: string, reason?: string) {
     startTransition(async () => {
       const result = await updateProspectState(prospectId, to, reason)
       if (result.ok) {
-        toast.success(`${label}`, {
-          description: `${currentState} → ${to}`,
-        })
+        toast.success(label, { description: `${currentState} → ${to}` })
       } else {
         toast.error('Update failed', { description: result.error || 'Unknown error' })
+      }
+    })
+  }
+
+  function handleApprove() {
+    startTransition(async () => {
+      const result = await approveProspectMockup(prospectId)
+      if (result.ok) {
+        toast.success('Mockup approved', { description: 'mockup_review_pending → mockup_ready' })
+      } else {
+        toast.error('Approve failed', { description: result.error || 'Unknown error' })
+      }
+    })
+  }
+
+  function handleReject(reason: RejectReason) {
+    setShowRejectDropdown(false)
+    startTransition(async () => {
+      const result = await rejectProspectMockup(prospectId, reason)
+      const isTerminal = reason === 'hallucinated_logo' || reason === 'low_quality_source'
+      if (result.ok) {
+        toast.success(isTerminal ? 'Rejected → lost (terminal)' : 'Rejected → qualified (retry)', { description: reason.replace(/_/g, ' ') })
+      } else {
+        toast.error('Reject failed', { description: result.error || 'Unknown error' })
       }
     })
   }
@@ -95,13 +127,46 @@ export function StateActions({
         <StateBadge state={currentState} />
       </div>
 
-      {actions.length === 0 ? (
-        <p className="text-xs text-white/30">
-          {currentState === 'won'
-            ? 'Terminal state — no further transitions.'
-            : 'No manual transitions available from this state.'}
-        </p>
-      ) : (
+      {/* mockup_review_pending: approve / reject+reason / lost+reason */}
+      {isReviewPending && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleApprove}
+              disabled={pending}
+              className={`px-3 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLS.primary}`}
+            >
+              {pending ? '...' : 'Approve (A)'}
+            </button>
+            <button
+              onClick={() => setShowRejectDropdown(!showRejectDropdown)}
+              disabled={pending}
+              className={`px-3 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLS.danger}`}
+            >
+              {pending ? '...' : 'Reject / Lost (R)'}
+            </button>
+          </div>
+
+          {showRejectDropdown && (
+            <div className="space-y-1 border border-white/[0.06] bg-black/40 p-3">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/40">Select reason:</p>
+              {REJECT_REASONS.map(r => (
+                <button
+                  key={r.value}
+                  onClick={() => handleReject(r.value)}
+                  disabled={pending}
+                  className="block w-full px-3 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Standard state actions (non-review states) */}
+      {!isReviewPending && actions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {actions.map(action => (
             <button
@@ -116,8 +181,15 @@ export function StateActions({
         </div>
       )}
 
-      {/* Reset — visually separated, confirms before firing.
-          Hidden when already at 'discovered' (no-op). */}
+      {!isReviewPending && actions.length === 0 && (
+        <p className="text-xs text-white/30">
+          {currentState === 'won'
+            ? 'Terminal state — no further transitions.'
+            : 'No manual transitions available from this state.'}
+        </p>
+      )}
+
+      {/* Reset — visually separated, confirms before firing */}
       {currentState !== 'discovered' && (
         <div className="mt-5 border-t border-white/[0.04] pt-4">
           <button

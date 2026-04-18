@@ -132,6 +132,107 @@ export async function verifyProspectMockup(prospectId: string): Promise<ActionRe
   }
 }
 
+/**
+ * Approve a mockup — transitions mockup_review_pending → mockup_ready.
+ */
+export async function approveProspectMockup(prospectId: string): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const sb = getSupabaseServer()
+    if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+    const { data: p } = await sb.from('prospects').select('pipeline_state').eq('id', prospectId).single()
+    if (!p) return { ok: false, error: 'Prospect not found' }
+    if (p.pipeline_state !== 'mockup_review_pending') {
+      return { ok: false, error: `Cannot approve — state is ${p.pipeline_state}, not mockup_review_pending` }
+    }
+
+    await sb.from('prospects').update({ pipeline_state: 'mockup_ready' }).eq('id', prospectId)
+    await sb.from('prospect_events').insert({
+      prospect_id: prospectId,
+      event: 'mockup_approved',
+      payload: { from: 'mockup_review_pending', to: 'mockup_ready', actor: 'admin_manual' },
+    })
+
+    revalidatePath('/admin')
+    revalidatePath('/admin/review')
+    revalidatePath(`/admin/prospects/${prospectId}`)
+    return { ok: true }
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error'
+    return { ok: false, error: msg === 'Unauthorized' ? 'Unauthorized' : 'Action failed' }
+  }
+}
+
+export type RejectReason = 'hallucinated_logo' | 'wrong_composition' | 'low_quality_source' | 'other'
+
+/**
+ * Reject a mockup — branches by reason:
+ * - hallucinated_logo → lost (terminal, don't retry)
+ * - wrong_composition → qualified (retry, increment retry_count; if >= 2 → lost)
+ * - low_quality_source → lost (terminal, source logo is the problem)
+ * - other → qualified (retry once, same retry_count logic)
+ */
+export async function rejectProspectMockup(
+  prospectId: string,
+  reason: RejectReason,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const sb = getSupabaseServer()
+    if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+    const { data: p } = await sb
+      .from('prospects')
+      .select('pipeline_state, mockup_retry_count')
+      .eq('id', prospectId)
+      .single()
+    if (!p) return { ok: false, error: 'Prospect not found' }
+
+    const retryCount = (p.mockup_retry_count as number) || 0
+    const isTerminal = reason === 'hallucinated_logo' || reason === 'low_quality_source'
+    const maxRetries = isTerminal ? 0 : 2
+    const exhaustedRetries = !isTerminal && retryCount >= maxRetries - 1
+
+    // Determine target state
+    const toState = isTerminal || exhaustedRetries ? 'lost' : 'qualified'
+
+    // Determine event name
+    const eventName = isTerminal
+      ? (reason === 'hallucinated_logo' ? 'mockup_rejected_terminal' : 'mockup_rejected_source_quality')
+      : 'mockup_rejected'
+
+    // Update prospect
+    const update: Record<string, unknown> = { pipeline_state: toState }
+    if (!isTerminal && !exhaustedRetries) {
+      update.mockup_retry_count = retryCount + 1
+    }
+    await sb.from('prospects').update(update).eq('id', prospectId)
+
+    // Write event
+    await sb.from('prospect_events').insert({
+      prospect_id: prospectId,
+      event: eventName,
+      payload: {
+        from: p.pipeline_state,
+        to: toState,
+        reason,
+        retry_count: retryCount,
+        exhausted_retries: exhaustedRetries,
+        actor: 'admin_manual',
+      },
+    })
+
+    revalidatePath('/admin')
+    revalidatePath('/admin/review')
+    revalidatePath(`/admin/prospects/${prospectId}`)
+    return { ok: true }
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error'
+    return { ok: false, error: msg === 'Unauthorized' ? 'Unauthorized' : 'Action failed' }
+  }
+}
+
 export async function addProspectNote(
   prospectId: string,
   note: string,

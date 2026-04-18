@@ -54,7 +54,7 @@ function isValidEmail(email: string | null | undefined): boolean {
 
 // Pipeline state ordering — used to determine which stages to skip on resume
 const STATE_ORDER = [
-  'discovered', 'enriched', 'qualified', 'mockup_ready',
+  'discovered', 'enriched', 'qualified', 'mockup_review_pending', 'mockup_ready',
   'sent', 'opened', 'replied', 'positive', 'booked', 'won', 'lost', 'dead',
 ] as const
 
@@ -250,8 +250,8 @@ async function main() {
             currentState = 'discovered'
           }
 
-          // Already fully processed (mockup_ready or beyond) → skip
-          if (isAtOrPast(currentState, 'mockup_ready')) {
+          // Already has mockup generated (review_pending or beyond) → skip
+          if (isAtOrPast(currentState, 'mockup_review_pending')) {
             console.log(`    [skip] Already at '${currentState}'`)
             stats.skipped_done++
             continue
@@ -392,7 +392,7 @@ async function main() {
       // ── Sendability gate: skip mockup generation if owner or email missing ──
       // Default gate is true; niche config can set mockupGate: false to override.
       const gateEnabled = nicheConfig.mockupGate !== false
-      if (gateEnabled && !isAtOrPast(currentState, 'mockup_ready')) {
+      if (gateEnabled && !isAtOrPast(currentState, 'mockup_review_pending')) {
         const hasOwner = !!enriched.owner_first_name
         const hasEmail = !!enriched.email && isValidEmail(enriched.email)
         if (!hasOwner || !hasEmail) {
@@ -411,7 +411,7 @@ async function main() {
       }
 
       // ── Stage: qualified → mockup_ready ──
-      if (!isAtOrPast(currentState, 'mockup_ready') && !dryRun) {
+      if (!isAtOrPast(currentState, 'mockup_review_pending') && !dryRun) {
         // Load logo buffer
         let logoBuffer: Buffer
         if (isFixture) {
@@ -461,8 +461,8 @@ async function main() {
             suggested_price_usd: nicheConfig.priceRange[0],
           }).eq('id', existingId)
 
-          await updatePipelineState(existingId, 'mockup_ready', { mockup_url: mockupUrl })
-          console.log(`    [state] qualified → mockup_ready`)
+          await updatePipelineState(existingId, 'mockup_review_pending', { mockup_url: mockupUrl })
+          console.log(`    [state] qualified → mockup_review_pending (needs human review)`)
           newlyMockupReady.push({ id: existingId, slug })
         }
 

@@ -9,6 +9,7 @@ const STAGES: { key: keyof NicheMetrics; label: string; color: string }[] = [
   { key: 'total', label: 'Total', color: 'bg-white/10' },
   { key: 'qualified', label: 'Qual', color: 'bg-cyan-500/50' },
   { key: 'sendable', label: 'Send', color: 'bg-blue-500/50' },
+  { key: 'mockup_review_pending', label: 'Rev', color: 'bg-yellow-500/50' },
   { key: 'mockup_ready', label: 'Mock', color: 'bg-amber-500/50' },
   { key: 'sent', label: 'Sent', color: 'bg-purple-500/50' },
   { key: 'replied', label: 'Rep', color: 'bg-pink-500/50' },
