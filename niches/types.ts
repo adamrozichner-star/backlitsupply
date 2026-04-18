@@ -39,6 +39,7 @@ export interface NicheConfig {
   chainBlocklist?: string[]   // niche-specific chain names (merged with global list)
   templates: string[]         // template IDs for SharpCompositor fallback
   mockupPrompt: string        // AI image generation prompt for ReplicateGenerator
+  mockupPromptRetry?: string  // composition-focused retry prompt for wrong_composition rejections
   mockupGate?: boolean        // default true — gate mockup gen on owner+email present
   copyAngle: string           // prompt variant for outreach copy
   priceRange: [number, number]  // [min, max] USD

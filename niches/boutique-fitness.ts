@@ -45,6 +45,7 @@ const config: NicheConfig = {
   ],
   templates: ['wall-02', 'wall-04', 'wall-05'],
   mockupPrompt: 'A photorealistic close-up of a boutique fitness studio entrance sign at night. The sign features the provided logo rendered as matte black or painted-metal letters with vibrant warm backlighting against a textured plaster or exposed brick wall. Energetic atmosphere, members-photographed brand wall, studio lighting, shallow depth of field. No other text or signage in frame.',
+  mockupPromptRetry: 'Preserve the exact logo from the reference image without modification. Focus on clean centered composition, even backlight glow, dark matte background, and professional signage photography. The logo should appear as a physical illuminated sign mounted on a wall, not a digital rendering. No other text or signage in the frame.',
   copyAngle: 'community-energy',
   priceRange: [600, 1200],
   killSwitch: {

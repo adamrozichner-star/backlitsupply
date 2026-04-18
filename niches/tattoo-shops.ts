@@ -35,6 +35,7 @@ const config: NicheConfig = {
   chainBlocklist: [],   // Tattoo is virtually all indie
   templates: ['wall-03', 'wall-04', 'wall-05'],
   mockupPrompt: 'A photorealistic close-up of a tattoo studio entrance sign at night. The sign features the provided logo rendered as matte black or brushed-steel letters with moody warm backlighting against a raw concrete or dark industrial brick wall. Gritty, artist-driven aesthetic, studio-craft feel, low-key lighting, shallow depth of field. No other text or signage in frame.',
+  mockupPromptRetry: 'Preserve the exact logo from the reference image without modification. Focus on clean centered composition, even backlight glow, dark matte background, and professional signage photography. The logo should appear as a physical illuminated sign mounted on a wall, not a digital rendering. No other text or signage in the frame.',
   copyAngle: 'craft-aesthetic',
   priceRange: [500, 1100],
   killSwitch: {

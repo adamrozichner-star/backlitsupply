@@ -15,11 +15,12 @@ import { resolve } from 'path'
 import type { NicheConfig } from '../../niches/types'
 
 export interface MockupGenerator {
-  generate(logo: Buffer, niche: NicheConfig, slug: string): Promise<{
+  generate(logo: Buffer, niche: NicheConfig, slug: string, retryCount?: number): Promise<{
     buffer: Buffer
     cost_usd: number
     model: string
     prediction_id?: string | null
+    prompt_used: 'default' | 'retry'
   }>
 }
 
@@ -42,7 +43,7 @@ export class SharpCompositor implements MockupGenerator {
     await compositeMockup({ logoPath, templateId, outputPath, slug })
 
     const buffer = readFileSync(outputPath)
-    return { buffer, cost_usd: 0, model: 'sharp-compositor', prediction_id: null }
+    return { buffer, cost_usd: 0, model: 'sharp-compositor', prediction_id: null, prompt_used: 'default' as const }
   }
 }
 
@@ -60,9 +61,17 @@ export class ReplicateGenerator implements MockupGenerator {
     this.client = new Replicate({ auth: token })
   }
 
-  async generate(logo: Buffer, niche: NicheConfig, slug: string) {
+  async generate(logo: Buffer, niche: NicheConfig, slug: string, retryCount: number = 0) {
     const logoDataUri = `data:image/png;base64,${logo.toString('base64')}`
-    const prompt = niche.mockupPrompt
+
+    // Select prompt: use retry variant if retryCount > 0 and niche has one
+    const useRetry = retryCount > 0 && !!niche.mockupPromptRetry
+    const prompt = useRetry ? niche.mockupPromptRetry! : niche.mockupPrompt
+    const prompt_used = useRetry ? 'retry' as const : 'default' as const
+
+    if (useRetry) {
+      console.log(`    [mockup] Using RETRY prompt (retry_count=${retryCount})`)
+    }
 
     let model: string = PRIMARY_MODEL
     let runResult: { output: unknown; predictionId: string | null }
@@ -112,7 +121,7 @@ export class ReplicateGenerator implements MockupGenerator {
       }
     }
 
-    return { buffer, cost_usd, model, prediction_id }
+    return { buffer, cost_usd, model, prediction_id, prompt_used }
   }
 
   private async runWithRetry(model: string, prompt: string, imageDataUri: string, maxRetries = 3): Promise<{ output: unknown; predictionId: string | null }> {

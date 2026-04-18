@@ -229,17 +229,19 @@ async function main() {
       // ── Check existing state (Supabase or file tracker) ──
       let existingId: string | null = null
       let currentState: string = 'new'  // 'new' means not yet in DB
+      let retryCount = 0
 
       if (supabase) {
         const { data: existing } = await supabase
           .from('prospects')
-          .select('id, pipeline_state, enrichment_version')
+          .select('id, pipeline_state, enrichment_version, mockup_retry_count')
           .eq('slug', slug)
           .single()
 
         if (existing) {
           existingId = existing.id
           currentState = existing.pipeline_state || 'discovered'
+          retryCount = (existing.mockup_retry_count as number) || 0
           const existingVersion = existing.enrichment_version ?? 1
 
           // Check enrichment version — force re-enrich if stale
@@ -429,7 +431,7 @@ async function main() {
         const mockupOutputPath = resolve(mockupDir, `${slug}.webp`)
 
         try {
-          const result = await mockupGen.generate(logoBuffer, nicheConfig, slug)
+          const result = await mockupGen.generate(logoBuffer, nicheConfig, slug, retryCount)
           writeFileSync(mockupOutputPath, result.buffer)
           console.log(`    [mockup] ${result.model} → ${mockupOutputPath} ($${result.cost_usd.toFixed(3)})`)
           stats.mockups++
@@ -439,6 +441,8 @@ async function main() {
               model: result.model,
               cost_usd: result.cost_usd,
               prediction_id: result.prediction_id,
+              prompt_used: result.prompt_used,
+              retry_count: retryCount,
             })
             // Cost event for Replicate (0 when SharpCompositor fallback)
             if (result.cost_usd > 0) {

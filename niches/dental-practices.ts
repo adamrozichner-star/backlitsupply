@@ -38,6 +38,7 @@ const config: NicheConfig = {
   ],
   templates: ['wall-01', 'wall-02', 'wall-05'],
   mockupPrompt: 'A photorealistic close-up of a modern dental clinic reception sign at night. The sign features the provided logo rendered as polished brushed-steel letters with soft warm halo backlighting against a clean white or light-grey clinical wall. Reception area lighting, professional medical aesthetic, calm and trustworthy atmosphere, shallow depth of field. No other text or signage in frame.',
+  mockupPromptRetry: 'Preserve the exact logo from the reference image without modification. Focus on clean centered composition, even backlight glow, dark matte background, and professional signage photography. The logo should appear as a physical illuminated sign mounted on a wall, not a digital rendering. No other text or signage in the frame.',
   copyAngle: 'clinical-premium',
   priceRange: [600, 1400],
   killSwitch: {
