@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Toaster } from 'sonner'
+import { getReviewQueueCount } from '@/lib/admin/queries'
 
 export const metadata: Metadata = {
   title: 'Admin',
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const reviewCount = await getReviewQueueCount()
+
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0a0a0a]/90 backdrop-blur">
@@ -21,6 +24,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="text-xs font-medium uppercase tracking-widest text-amber-500">Admin</span>
           </Link>
           <nav className="flex items-center gap-4">
+            <Link
+              href="/admin/review"
+              className="flex items-center gap-1.5 text-xs text-white/40 transition-colors hover:text-amber-500"
+            >
+              Review
+              {reviewCount > 0 && (
+                <span className="rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-yellow-300">
+                  {reviewCount}
+                </span>
+              )}
+            </Link>
             <Link
               href="/admin/niches"
               className="text-xs text-white/40 transition-colors hover:text-amber-500"
