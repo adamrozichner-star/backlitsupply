@@ -112,6 +112,12 @@ async function main() {
   }
 
   const useFixtureLlm = isFixture
+  const hunterAvailable = !!process.env.HUNTER_API_KEY
+  if (hunterAvailable) {
+    console.log('[hunter] Hunter.io email enrichment enabled')
+  } else if (!isFixture) {
+    console.log('[hunter] HUNTER_API_KEY not set — email enrichment disabled, 80%+ prospects will gate at no_email')
+  }
 
   if (isFixture) process.env.PIPELINE_SOURCE = 'fixture'
   // Set niche query for Outscraper/Google Places search term(s).
