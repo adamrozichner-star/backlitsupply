@@ -44,3 +44,16 @@ Corrections and patterns to avoid. Updated after every mistake.
 - **Batch 2 — two-stage (AI scenes + Sharp composite)**: AI generates empty backlit wall scenes, Sharp composites real logo onto them. Pixel-perfect logo fidelity. Problem: logos look flat, no 3D depth, no per-letter halo. Scenes were excellent but compositing couldn't match photorealism. **REJECTED.**
 - **Batch 3 — dual-reference AI (scene + logo as two inputs)**: Sent both a scene image and logo to Gemini. Results similar to batch 1 — model still regenerates letterforms when it wants to. No fidelity improvement over single-pass. Extra complexity for no gain. **REJECTED.**
 - Decision: font substitution on wordmarks is an acceptable tradeoff vs. flat compositing. Most prospects will see their business name rendered as a premium sign — even if the exact font differs slightly, the emotional impact (seeing their brand on a real-looking sign) drives replies. Revisit if reply-rate data shows fidelity matters.
+
+## Retry prompt branching verified (2026-04-18)
+- wrong_composition rejection → prospect returns to qualified with retry_count=1 → pipeline re-runs with composition-focused retry prompt → visually distinct output confirmed
+- Original (default prompt): textured concrete wall, warm amber, angled environmental shot
+- Retry (composition prompt): dark matte background, centered, even glow, studio signage style
+- The retry prompt meaningfully changes Gemini's output — not a loop
+- hallucinated_logo and low_quality_source route to lost terminally; only wrong_composition and other retry
+
+## 90% gate rate is the real bottleneck (2026-04-18)
+- 18 of 20 qualified prospects had no email → couldn't advance past the mockup gate
+- Review queue infrastructure is proven but starved for input until email enrichment ships
+- Hunter.io or equivalent (Phase 7D) is now the highest-priority next phase — without it, the pipeline generates prospects it can never contact
+- The pipeline is generating ~20 qualified prospects per niche per batch, but only ~2 survive the email gate
