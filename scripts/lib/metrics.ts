@@ -43,7 +43,7 @@ export async function updatePipelineState(
  * event format: 'cost:places' | 'cost:haiku' | 'cost:replicate'
  */
 export async function recordCost(
-  provider: 'places' | 'haiku' | 'replicate',
+  provider: 'places' | 'haiku' | 'replicate' | 'hunter',
   usd: number,
   details?: Record<string, unknown>,
 ): Promise<void> {
