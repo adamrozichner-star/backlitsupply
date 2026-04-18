@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import type { ReviewQueueItem } from '@/lib/admin/queries'
@@ -132,13 +131,11 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
           </p>
           <div className="flex min-h-[300px] items-center justify-center p-4">
             {current.logo_url ? (
-              <Image
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
                 src={current.logo_url}
                 alt="Source logo"
-                width={800}
-                height={400}
                 className="max-h-[400px] w-auto object-contain"
-                unoptimized
               />
             ) : (
               <p className="text-xs text-white/30">No source logo available</p>
@@ -154,13 +151,11 @@ export function ReviewQueue({ items: initialItems }: { items: ReviewQueueItem[] 
           <div className="flex min-h-[300px] items-center justify-center p-4">
             {current.mockup_url ? (
               <a href={current.mockup_url} target="_blank" rel="noopener noreferrer">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={current.mockup_url}
                   alt="Generated mockup"
-                  width={1600}
-                  height={1000}
                   className="max-h-[400px] w-auto object-contain"
-                  unoptimized
                 />
               </a>
             ) : (

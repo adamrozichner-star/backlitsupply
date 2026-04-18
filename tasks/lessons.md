@@ -45,6 +45,13 @@ Corrections and patterns to avoid. Updated after every mistake.
 - **Batch 3 — dual-reference AI (scene + logo as two inputs)**: Sent both a scene image and logo to Gemini. Results similar to batch 1 — model still regenerates letterforms when it wants to. No fidelity improvement over single-pass. Extra complexity for no gain. **REJECTED.**
 - Decision: font substitution on wordmarks is an acceptable tradeoff vs. flat compositing. Most prospects will see their business name rendered as a premium sign — even if the exact font differs slightly, the emotional impact (seeing their brand on a real-looking sign) drives replies. Revisit if reply-rate data shows fidelity matters.
 
+## Review queue UX test findings (2026-04-18, Task 0 close-out)
+- **Friction #1 (FIXED)**: Source logo image not rendering — next/image with unoptimized doesn't handle arbitrary external HTTP URLs on admin pages. Switched to plain img tag. Logo now loads correctly.
+- Page load: 1239ms (under 2s target)
+- All UI elements present and functional
+- Estimated time per review: ~5-8 sec for approve, ~10-12 sec for reject
+- No keyboard double-fire observed
+
 ## Retry prompt branching verified (2026-04-18)
 - wrong_composition rejection → prospect returns to qualified with retry_count=1 → pipeline re-runs with composition-focused retry prompt → visually distinct output confirmed
 - Original (default prompt): textured concrete wall, warm amber, angled environmental shot
