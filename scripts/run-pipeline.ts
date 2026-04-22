@@ -303,6 +303,7 @@ async function main() {
             state: enriched.state,
             niche: nicheName,
             logo_url: enriched.logo_url,
+            logo_extraction_trace: enriched.logo_extraction_trace || null,
             source: enriched.source_slug,
             pipeline_state: 'discovered',
             enrichment_version: CURRENT_ENRICHMENT_VERSION,
@@ -324,6 +325,7 @@ async function main() {
             owner_last_name: enriched.owner_last_name || null,
             email: enriched.email || null,
             logo_url: enriched.logo_url || null,
+            logo_extraction_trace: enriched.logo_extraction_trace || null,
             website: enriched.website || null,
             enrichment_version: CURRENT_ENRICHMENT_VERSION,
           }).eq('id', existingId)

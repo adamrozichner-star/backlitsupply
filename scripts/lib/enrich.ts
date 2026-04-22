@@ -21,83 +21,161 @@ import type { QualifyConfig } from '../../niches/types'
  *   v2 = multi-page crawl + owner role evidence guardrail
  *   v3 = expanded role tokens (founded/owns/led by/possessives) + same-sentence
  *        name extraction prompt — fixes false rejections of valid ownership signals
+ *   v4 = inverted logo extraction priority (logo-class → header/nav → favicon →
+ *        apple-touch → og:image LAST), dimension/aspect-ratio/content-type filtering
  */
-export const CURRENT_ENRICHMENT_VERSION = 3
+export const CURRENT_ENRICHMENT_VERSION = 4
 
-// ─── Logo discovery ─────────────────────────────────────
+// ─── Logo discovery (v4: inverted priority, dimension + format filtering) ────
 
 interface LogoCandidate {
   url: string
-  priority: number  // lower = better
+  tier: number       // 1-6 (1 = best)
+  tierName: string
 }
 
+/**
+ * Content-type preference scoring: SVG > PNG > WebP > JPG.
+ * Logos are almost never JPG — JPG is a strong photo signal.
+ */
+const FORMAT_SCORE: Record<string, number> = {
+  'image/svg+xml': 10,
+  'image/png': 8,
+  'image/webp': 5,
+  'image/jpeg': 2,
+  'image/x-icon': 1,
+  'image/vnd.microsoft.icon': 1,
+}
+
+export interface LogoExtractionTrace {
+  candidates: Array<{
+    url: string; tier: number; tierName: string; formatScore: number
+    width?: number; height?: number; rejected?: string
+  }>
+  winner: { url: string; tier: number; tierName: string; width: number; height: number; formatScore: number } | null
+}
+
+function resolveUrl(url: string, base: string): string {
+  try { return new URL(url, base).href } catch { return url }
+}
+
+/**
+ * Extract logo candidates with INVERTED priority (vs v1-v3):
+ *   Tier 1: <img> with "logo" in src/alt/class/id (most specific signal)
+ *   Tier 2: <img> in <header>/<nav> (structural position)
+ *   Tier 3: High-res favicon chain (512→192→96→32)
+ *   Tier 4: apple-touch-icon
+ *   Tier 5: SVG in <header>/<nav>
+ *   Tier 6: og:image / twitter:image (LAST RESORT — usually hero photos)
+ */
 function extractLogoCandidates(html: string, baseUrl: string): LogoCandidate[] {
   const $ = cheerio.load(html)
   const candidates: LogoCandidate[] = []
+  const seen = new Set<string>()
 
-  // Priority 1: og:image
-  const ogImage = $('meta[property="og:image"]').attr('content')
-  if (ogImage) candidates.push({ url: resolveUrl(ogImage, baseUrl), priority: 1 })
+  function add(url: string, tier: number, tierName: string) {
+    const resolved = resolveUrl(url, baseUrl)
+    if (seen.has(resolved)) return
+    seen.add(resolved)
+    candidates.push({ url: resolved, tier, tierName })
+  }
 
-  // Priority 2: twitter:image
-  const twImage = $('meta[name="twitter:image"]').attr('content')
-  if (twImage) candidates.push({ url: resolveUrl(twImage, baseUrl), priority: 2 })
-
-  // Priority 3: apple-touch-icon
-  const touchIcon = $('link[rel="apple-touch-icon"]').attr('href')
-  if (touchIcon) candidates.push({ url: resolveUrl(touchIcon, baseUrl), priority: 3 })
-
-  // Priority 4: largest <img> in <header>
-  $('header img, .header img, #header img, nav img').each((_, el) => {
-    const src = $(el).attr('src')
-    if (src) candidates.push({ url: resolveUrl(src, baseUrl), priority: 4 })
-  })
-
-  // Priority 5: any img with "logo" in src, alt, or class
+  // Tier 1: <img> with "logo" in src, alt, class, or id
   $('img').each((_, el) => {
     const src = $(el).attr('src') || ''
     const alt = $(el).attr('alt') || ''
     const cls = $(el).attr('class') || ''
-    if (/logo/i.test(src + alt + cls) && src) {
-      candidates.push({ url: resolveUrl(src, baseUrl), priority: 5 })
-    }
+    const id = $(el).attr('id') || ''
+    if (/logo/i.test(src + alt + cls + id) && src) add(src, 1, 'logo-attr')
   })
 
-  return candidates.sort((a, b) => a.priority - b.priority)
-}
+  // Tier 2: <img> in <header> or <nav>
+  $('header img, .header img, #header img, nav img, .nav img, .navbar img').each((_, el) => {
+    const src = $(el).attr('src')
+    if (src) add(src, 2, 'header-nav')
+  })
 
-function resolveUrl(url: string, base: string): string {
-  try {
-    return new URL(url, base).href
-  } catch {
-    return url
+  // Tier 3: High-res favicon chain
+  for (const size of ['512x512', '192x192', '96x96', '32x32']) {
+    $(`link[rel="icon"][sizes="${size}"]`).each((_, el) => {
+      const href = $(el).attr('href')
+      if (href) add(href, 3, `favicon-${size}`)
+    })
   }
+  $('link[rel="icon"]:not([sizes])').each((_, el) => {
+    const href = $(el).attr('href')
+    if (href) add(href, 3, 'favicon')
+  })
+
+  // Tier 4: apple-touch-icon
+  $('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').each((_, el) => {
+    const href = $(el).attr('href')
+    if (href) add(href, 4, 'apple-touch-icon')
+  })
+
+  // Tier 5: (reserved for SVG extraction — complex, skipped for now)
+
+  // Tier 6: og:image / twitter:image (LAST RESORT — usually hero photos, not logos)
+  const ogImage = $('meta[property="og:image"]').attr('content')
+  if (ogImage) add(ogImage, 6, 'og:image')
+  const twImage = $('meta[name="twitter:image"]').attr('content')
+  if (twImage) add(twImage, 6, 'twitter:image')
+
+  return candidates.sort((a, b) => a.tier - b.tier)
 }
 
-const VALID_FORMATS = new Set(['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'])
-
-async function validateLogo(url: string, minSize: number): Promise<{ url: string; width: number; height: number } | null> {
+/**
+ * Validate a logo candidate with dimension + aspect-ratio + content-type filters.
+ * Returns null if the image fails any filter:
+ *   - >1000px in either dimension (banners/photos)
+ *   - Aspect ratio outside 1:3 to 3:1 (banners)
+ *   - Below minSize width
+ *   - Invalid content-type
+ */
+async function validateLogo(
+  url: string,
+  minSize: number,
+): Promise<{ url: string; width: number; height: number; formatScore: number; rejected?: string } | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
-    if (!res.ok) return null
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    if (!res.ok) return { url, width: 0, height: 0, formatScore: 0, rejected: `http-${res.status}` }
 
-    const contentType = res.headers.get('content-type')?.split(';')[0]
-    if (contentType && !VALID_FORMATS.has(contentType)) return null
+    const contentType = res.headers.get('content-type')?.split(';')[0] || ''
+    const fmtScore = FORMAT_SCORE[contentType] || 0
 
-    // For SVGs, we can't easily measure dimensions, but they're always scalable
-    if (contentType === 'image/svg+xml') {
-      return { url, width: 1000, height: 1000 }  // treat as large enough
+    if (!contentType.startsWith('image/')) {
+      return { url, width: 0, height: 0, formatScore: 0, rejected: `bad-content-type: ${contentType}` }
     }
 
-    // For raster images, check dimensions via sharp
+    // SVGs are always valid logos
+    if (contentType === 'image/svg+xml') {
+      return { url, width: 500, height: 500, formatScore: 10 }
+    }
+
     const buffer = Buffer.from(await res.arrayBuffer())
-    const sharp = (await import('sharp')).default
-    const meta = await sharp(buffer).metadata()
+    const sharpMod = (await import('sharp')).default
+    const meta = await sharpMod(buffer).metadata()
+    if (!meta.width || !meta.height) {
+      return { url, width: 0, height: 0, formatScore: fmtScore, rejected: 'no-dimensions' }
+    }
 
-    if (!meta.width || !meta.height) return null
-    if (meta.width < minSize) return null
+    // Dimension filter: reject >1000px in either dimension
+    if (meta.width > 1000 || meta.height > 1000) {
+      return { url, width: meta.width, height: meta.height, formatScore: fmtScore, rejected: `too-large: ${meta.width}x${meta.height}` }
+    }
 
-    return { url, width: meta.width, height: meta.height }
+    // Aspect ratio filter: reject outside 1:3 to 3:1
+    const ratio = meta.width / meta.height
+    if (ratio > 3 || ratio < 1 / 3) {
+      return { url, width: meta.width, height: meta.height, formatScore: fmtScore, rejected: `bad-ratio: ${ratio.toFixed(2)}` }
+    }
+
+    // Min size
+    if (meta.width < minSize) {
+      return { url, width: meta.width, height: meta.height, formatScore: fmtScore, rejected: `too-small: ${meta.width}px` }
+    }
+
+    return { url, width: meta.width, height: meta.height, formatScore: fmtScore }
   } catch {
     return null
   }
@@ -399,20 +477,45 @@ export async function enrichListing(
     return null
   }
 
-  // Find logo
+  // Find logo (v4: inverted priority, dimension + format filtering)
   const logoCandidates = extractLogoCandidates(html, listing.website)
+  const logoTrace: LogoExtractionTrace = { candidates: [], winner: null }
   let logo: { url: string; width: number; height: number } | null = null
 
   for (const candidate of logoCandidates) {
-    logo = await validateLogo(candidate.url, qualifyConfig.minLogoSize)
-    if (logo) break
+    const result = await validateLogo(candidate.url, qualifyConfig.minLogoSize)
+    if (!result) continue
+
+    const traceEntry = {
+      url: candidate.url,
+      tier: candidate.tier,
+      tierName: candidate.tierName,
+      formatScore: result.formatScore,
+      width: result.width,
+      height: result.height,
+      rejected: result.rejected,
+    }
+    logoTrace.candidates.push(traceEntry)
+
+    if (!result.rejected && !logo) {
+      // First valid candidate wins (tier-sorted), ties broken by format score
+      if (!logoTrace.winner || candidate.tier < logoTrace.winner.tier ||
+          (candidate.tier === logoTrace.winner.tier && result.formatScore > logoTrace.winner.formatScore)) {
+        logoTrace.winner = {
+          url: candidate.url, tier: candidate.tier, tierName: candidate.tierName,
+          width: result.width, height: result.height, formatScore: result.formatScore,
+        }
+        logo = { url: candidate.url, width: result.width, height: result.height }
+      }
+    }
   }
 
   if (!logo) {
-    console.log(`    [enrich] Skip — no valid logo found (${logoCandidates.length} candidates checked, min ${qualifyConfig.minLogoSize}px)`)
+    const rejected = logoTrace.candidates.filter(c => c.rejected).length
+    console.log(`    [enrich] Skip — no valid logo found (${logoCandidates.length} candidates, ${rejected} rejected, min ${qualifyConfig.minLogoSize}px)`)
     return null
   }
-  console.log(`    [enrich] Logo found: ${logo.url.slice(0, 80)}... (${logo.width}x${logo.height})`)
+  console.log(`    [enrich] Logo found: ${logoTrace.winner!.tierName} ${logo.url.slice(0, 60)}... (${logo.width}x${logo.height}, fmt:${logoTrace.winner!.formatScore})`)
 
   // Extract owner + email via LLM (multi-page crawl)
   console.log(`    [enrich] Crawling for owner/email (homepage + subpages)...`)
@@ -450,6 +553,7 @@ export async function enrichListing(
     logo_url: logo.url,
     logo_width: logo.width,
     logo_height: logo.height,
+    logo_extraction_trace: logoTrace as unknown as Record<string, unknown>,
     source_slug: listing.source_slug,
     source_id: listing.source_id,
   }

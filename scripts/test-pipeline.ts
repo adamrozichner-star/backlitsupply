@@ -223,14 +223,15 @@ async function main() {
   // ── Test 7: Enrichment version guard ───────────────────
   console.log('\nTest 7: Enrichment version guard')
   const { CURRENT_ENRICHMENT_VERSION } = await import('./lib/enrich')
-  assert('CURRENT_ENRICHMENT_VERSION is 3', CURRENT_ENRICHMENT_VERSION === 3)
+  assert('CURRENT_ENRICHMENT_VERSION is 4', CURRENT_ENRICHMENT_VERSION === 4)
   // A v1 prospect at qualified state should be detected as stale
   // (pipeline would reset to discovered and re-enrich)
   const staleVersion = 1
   const isStale = staleVersion < CURRENT_ENRICHMENT_VERSION
   assert('v1 prospect is stale (< CURRENT_ENRICHMENT_VERSION)', isStale)
-  assert('v2 prospect is now stale (< CURRENT_ENRICHMENT_VERSION)', 2 < CURRENT_ENRICHMENT_VERSION)
-  assert('v3 prospect is current (= CURRENT_ENRICHMENT_VERSION)', !(3 < CURRENT_ENRICHMENT_VERSION))
+  assert('v2 prospect is stale (< CURRENT_ENRICHMENT_VERSION)', 2 < CURRENT_ENRICHMENT_VERSION)
+  assert('v3 prospect is stale (< CURRENT_ENRICHMENT_VERSION)', 3 < CURRENT_ENRICHMENT_VERSION)
+  assert('v4 prospect is current (= CURRENT_ENRICHMENT_VERSION)', !(4 < CURRENT_ENRICHMENT_VERSION))
 
   // ── Summary ───────────────────────────────────────────
   console.log(`\n═══ Results: ${passed} passed, ${failed} failed ═══`)
