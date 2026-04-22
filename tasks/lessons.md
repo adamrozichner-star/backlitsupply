@@ -64,3 +64,16 @@ Corrections and patterns to avoid. Updated after every mistake.
 - Review queue infrastructure is proven but starved for input until email enrichment ships
 - Hunter.io or equivalent (Phase 7D) is now the highest-priority next phase — without it, the pipeline generates prospects it can never contact
 - The pipeline is generating ~20 qualified prospects per niche per batch, but only ~2 survive the email gate
+
+## Hunter.io integration results (2026-04-22)
+- Hit rate on med-spa + boutique-fitness (Austin + Miami) = **58%**, not the documented 32.5% average. Plan cost estimates accordingly — our niches have better-than-average email coverage.
+- Tier distribution: 44% Tier 1 (first-name match, e.g. shannon@vivadayspa.com), 56% Tier 3 (role-based, e.g. info@amedspa.com). Zero Tier 2 (full-name) and zero Tier 4 (rejected).
+- **56% role-based is a thesis-risk watchpoint**: personalized mockup emails sent to info@/hello@ may get lower reply rates than personal emails. Track `email_is_role_based` against reply rates in Phase 7C to validate. If role-based reply rate is <2%, consider dropping Tier 3 from the gate.
+- Free plan: limit=10 per domain search (limit=20 causes 400 pagination_error). 50 credits/month.
+- Cache working: vivadayspa.com was cached from a pre-test call, saved 1 credit on second lookup.
+
+## Mockup storage path bug (2026-04-22, root cause fixed)
+- Root cause: `public/mockups/` was in `.gitignore` (line 46). LocalStorage wrote mockups there, but Vercel deploys from git — so mockups never reached production. This caused the verification tail to downgrade 7 prospects on every batch run.
+- The `.gitignore` entry was a design mistake from when we thought mockups would be temporary. They're production assets — must be in git until R2 is live.
+- Fix: removed `public/mockups/` from `.gitignore`. Now `git add public/mockups/` works without `-f` flag. Normal git flow deploys mockups to Vercel.
+- **Previous pattern of force-committing individual files was a band-aid, not a fix.** This lesson applies to any generated asset that needs to reach production via git: if it's gitignored, it can't deploy.

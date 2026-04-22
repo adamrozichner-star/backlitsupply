@@ -43,5 +43,7 @@ next-env.d.ts
 # pipeline outputs (generated, not committed)
 scripts/output/
 scripts/templates/
-public/mockups/
 scripts/data/prospect-input.json
+# NOTE: public/mockups/ is NOT gitignored — mockup webps must be in git
+# to deploy to Vercel. Until R2 storage is live, this is the only path
+# to production. See tasks/lessons.md for context.
