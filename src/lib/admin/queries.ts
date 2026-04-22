@@ -34,6 +34,7 @@ export interface AdminProspect {
   mockup_url: string | null
   pipeline_state: PipelineState | null
   enrichment_version: number | null
+  instantly_lead_id: string | null
   source: string | null
   created_at: string
   days_in_state: number

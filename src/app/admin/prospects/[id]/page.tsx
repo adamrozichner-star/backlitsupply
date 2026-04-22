@@ -97,6 +97,7 @@ export default async function ProspectDetailPage({
               <Row label="Phone" value={prospect.phone} />
               <Row label="Source" value={prospect.source} />
               <Row label="Enrichment v" value={prospect.enrichment_version?.toString() || '—'} />
+              <Row label="Instantly" value={prospect.instantly_lead_id ? `✓ ${prospect.instantly_lead_id.slice(0, 12)}...` : '—'} />
               <Row label="Created" value={new Date(prospect.created_at).toISOString().slice(0, 10)} />
             </dl>
           </div>

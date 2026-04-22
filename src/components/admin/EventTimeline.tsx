@@ -35,6 +35,12 @@ const EVENT_COLORS: Record<string, string> = {
   mockup_rejected: 'bg-red-500/10 text-red-300 border-red-500/20',
   mockup_rejected_terminal: 'bg-red-500/15 text-red-200 border-red-500/30',
   mockup_rejected_source_quality: 'bg-red-500/15 text-red-200 border-red-500/30',
+  instantly_lead_created: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20',
+  'instantly:email_sent': 'bg-purple-500/10 text-purple-300 border-purple-500/20',
+  'instantly:email_opened': 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/20',
+  'instantly:reply_received': 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  'instantly:email_bounced': 'bg-red-500/15 text-red-200 border-red-500/30',
+  'instantly:lead_unsubscribed': 'bg-red-500/10 text-red-300 border-red-500/20',
   note: 'bg-yellow-500/10 text-yellow-200 border-yellow-500/20',
   page_visited: 'bg-emerald-500/10 text-emerald-200 border-emerald-500/20',
 }
