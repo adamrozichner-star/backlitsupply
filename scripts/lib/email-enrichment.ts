@@ -156,7 +156,7 @@ async function writeCache(domain: string, emails: HunterEmail[]): Promise<void> 
 // ─── API ────────────────────────────────────────────────
 
 async function hunterDomainSearch(domain: string, apiKey: string): Promise<HunterEmail[]> {
-  const url = `${HUNTER_API_BASE}/domain-search?domain=${encodeURIComponent(domain)}&api_key=${apiKey}&limit=20`
+  const url = `${HUNTER_API_BASE}/domain-search?domain=${encodeURIComponent(domain)}&api_key=${apiKey}&limit=10`
 
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
 
