@@ -93,12 +93,38 @@ async function main() {
     }
   }
 
-  const toPush = [...byDomain.values()]
+  const afterDedup = [...byDomain.values()]
 
   if (skippedDupes.length > 0) {
     console.log(`Deduped: ${skippedDupes.length} prospect(s) skipped (same domain as higher-priority lead):`)
     for (const s of skippedDupes) console.log(`  ⊘ ${s}`)
     console.log()
+  }
+
+  // Send-history guard: skip any prospect with prior send history
+  // Belt-and-suspenders protection against duplicate outreach, independent of state or instantly_lead_id
+  const SEND_EVENTS = ['state:sent', 'instantly:email_sent', 'instantly_lead_created']
+  const toPush: typeof afterDedup = []
+  const skippedHistory: string[] = []
+
+  for (const p of afterDedup) {
+    const { data: sendEvents } = await sb
+      .from('prospect_events')
+      .select('event')
+      .eq('prospect_id', p.id)
+      .in('event', SEND_EVENTS)
+      .limit(1)
+
+    if (sendEvents && sendEvents.length > 0) {
+      console.log(`  ⚠ Skipping ${p.slug} — prior send history (${sendEvents[0].event}), preventing duplicate outreach`)
+      skippedHistory.push(p.slug!)
+      continue
+    }
+    toPush.push(p)
+  }
+
+  if (skippedHistory.length > 0) {
+    console.log(`\nSend-history guard: ${skippedHistory.length} prospect(s) skipped to prevent duplicate outreach.\n`)
   }
 
   console.log(`Pushing ${toPush.length} prospect(s):\n`)
