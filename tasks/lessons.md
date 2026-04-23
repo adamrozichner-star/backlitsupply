@@ -92,3 +92,9 @@ Corrections and patterns to avoid. Updated after every mistake.
 - Med-spa is the only niche with meaningful personal email hit rate from Hunter.
 - Phase 7E should either deprioritize Tier 3 role-based emails or add a review-queue warning when a prospect's email is role-based, so the reviewer can decide whether the mockup is worth the send.
 - Tracked via `email_is_role_based` flag for reply-rate analysis after first sends land.
+
+## Instantly webhooks require Hyper Growth tier (2026-04-23)
+- Instantly webhooks (real-time event push) are only available on Hyper Growth plan ($40+/mo).
+- Workaround: polling POST /api/v2/leads/list every 5 min. Functionally identical for our use case — 5 min max lag vs real-time makes no difference when campaign sends are scheduled Tue-Thu 10am-2pm.
+- Polling is actually MORE reliable: no missed events from webhook delivery failures, no webhook URL rotation issues, no Vercel cold-start timeouts on incoming webhooks.
+- Vercel Hobby tier cron runs once/day max — use cron-job.org (free) or upgrade to Vercel Pro ($20/mo) for 5-min polling in production.
