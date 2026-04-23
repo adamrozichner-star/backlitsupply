@@ -251,11 +251,24 @@ async function main() {
           const existingVersion = existing.enrichment_version ?? 1
 
           // Check enrichment version — force re-enrich if stale
+          // CEILING: never re-enrich prospects at sent or later — the email is already
+          // delivered. Re-enriching would regress state and risk duplicate sends.
+          const TERMINAL_SEND_STATES = ['sent', 'opened', 'replied', 'positive', 'booked', 'won', 'lost', 'dead']
           if (isAtOrPast(currentState, 'enriched') && existingVersion < CURRENT_ENRICHMENT_VERSION) {
-            console.log(`    [version] enrichment_version ${existingVersion} < ${CURRENT_ENRICHMENT_VERSION} — resetting to discovered for re-enrichment`)
-            await supabase.from('prospects').update({ pipeline_state: 'discovered' }).eq('id', existingId)
-            await recordEvent(existingId!, 're-enriched_version_bump', { from_version: existingVersion, to_version: CURRENT_ENRICHMENT_VERSION })
-            currentState = 'discovered'
+            if (TERMINAL_SEND_STATES.includes(currentState)) {
+              console.log(`    [version] Skipping re-enrichment — prospect at '${currentState}' (terminal send state). v${existingVersion} → v${CURRENT_ENRICHMENT_VERSION} would regress.`)
+              await recordEvent(existingId!, 'reenrichment_skipped_terminal_state', {
+                version_would_be: CURRENT_ENRICHMENT_VERSION,
+                current_version: existingVersion,
+                current_state: currentState,
+              })
+              // Don't reset state, don't re-enrich. Let the skip-done check below handle it.
+            } else {
+              console.log(`    [version] enrichment_version ${existingVersion} < ${CURRENT_ENRICHMENT_VERSION} — resetting to discovered for re-enrichment`)
+              await supabase.from('prospects').update({ pipeline_state: 'discovered' }).eq('id', existingId)
+              await recordEvent(existingId!, 're-enriched_version_bump', { from_version: existingVersion, to_version: CURRENT_ENRICHMENT_VERSION })
+              currentState = 'discovered'
+            }
           }
 
           // Already has mockup generated (review_pending or beyond) → skip
