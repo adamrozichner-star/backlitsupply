@@ -98,3 +98,9 @@ Corrections and patterns to avoid. Updated after every mistake.
 - Workaround: polling POST /api/v2/leads/list every 5 min. Functionally identical for our use case — 5 min max lag vs real-time makes no difference when campaign sends are scheduled Tue-Thu 10am-2pm.
 - Polling is actually MORE reliable: no missed events from webhook delivery failures, no webhook URL rotation issues, no Vercel cold-start timeouts on incoming webhooks.
 - Vercel Hobby tier cron runs once/day max — use cron-job.org (free) or upgrade to Vercel Pro ($20/mo) for 5-min polling in production.
+
+## Vercel Hobby tier rejects subdaily cron schedules SILENTLY (2026-04-24)
+- Adding vercel.json with `*/5 * * * *` cron schedule caused Vercel to silently reject ALL subsequent git pushes at the integration layer. No error in git push output, no failed deployment in Vercel UI — just nothing happened. 4 commits went undeployed for 2 days.
+- Root cause: Hobby tier only allows daily crons. Subdaily schedules in vercel.json are invalid on Hobby, but Vercel doesn't surface the error anywhere visible.
+- Fix: deleted vercel.json entirely. We use cron-job.org externally — no Vercel-native cron needed.
+- **Lesson**: Always check Vercel Hobby/Pro tier limits before adding vercel.json config. When deploys stop silently, check vercel.json first — invalid config can block the entire Git integration pipeline.
