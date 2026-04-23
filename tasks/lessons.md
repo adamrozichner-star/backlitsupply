@@ -77,3 +77,11 @@ Corrections and patterns to avoid. Updated after every mistake.
 - The `.gitignore` entry was a design mistake from when we thought mockups would be temporary. They're production assets — must be in git until R2 is live.
 - Fix: removed `public/mockups/` from `.gitignore`. Now `git add public/mockups/` works without `-f` flag. Normal git flow deploys mockups to Vercel.
 - **Previous pattern of force-committing individual files was a band-aid, not a fix.** This lesson applies to any generated asset that needs to reach production via git: if it's gitignored, it can't deploy.
+
+## NEAR-MISS: v4 version bump regressed 4 already-sent prospects (2026-04-23)
+- **What happened**: v4 enrichment version bump reset ALL prospects to `discovered` for re-enrichment, including 4 that were already at `sent` (emails already delivered via Gmail). They re-enriched, re-qualified, got new mockups, entered the review queue, got approved back to `mockup_ready`.
+- **Impact if undetected**: Running `push-to-instantly` would have pushed them as new leads → duplicate emails from gotbacklit.com → spam signal → domain reputation damage.
+- **Why it happened**: The version bump guard had no state ceiling. It treated a prospect at `sent` the same as one at `enriched` — both got reset to `discovered`.
+- **Fix 1**: TERMINAL_SEND_STATES ceiling in version comparison — prospects at sent/opened/replied/positive/booked/won/lost/dead are never re-enriched. The email is already sent; re-enriching is pointless.
+- **Fix 2**: Push script send-history guard — queries prospect_events for any prior `state:sent` or `instantly_lead_created` event. Skips prospects with send history regardless of current state or instantly_lead_id. Belt + suspenders.
+- **Lesson**: Any pipeline operation that resets state (version bumps, manual resets, bug fixes) must have a "point of no return" check. Once an email is sent, that prospect's state must only move forward.
