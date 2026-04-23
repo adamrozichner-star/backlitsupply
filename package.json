@@ -12,6 +12,7 @@
     "batch": "tsx scripts/run-batch.ts",
     "verify": "tsx scripts/verify-mockups.ts",
     "push-instantly": "tsx scripts/push-to-instantly.ts",
+    "poll-instantly": "tsx scripts/lib/instantly-poller.ts",
     "loop": "tsx scripts/run-loop.ts",
     "test:pipeline": "tsx scripts/test-pipeline.ts"
   },
