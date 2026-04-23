@@ -184,7 +184,7 @@ async function main() {
   }
 
   let successCount = 0
-  const stats = { discovered: 0, enriched: 0, qualified: 0, hunter_found: 0, mockup_gated: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0 }
+  const stats: Record<string, number> = { discovered: 0, enriched: 0, qualified: 0, hunter_found: 0, mockup_gated: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0, enrichment_failures: 0 }
   // Track prospect IDs that reached mockup_ready in THIS run (for end-of-pipeline verification)
   const newlyMockupReady: { id: string; slug: string }[] = []
 
@@ -278,10 +278,32 @@ async function main() {
       let enriched: EnrichedProspect | null = null
 
       if (!isAtOrPast(currentState, 'enriched')) {
-        if (isFixture) {
-          enriched = enrichFromFixture(listing)
-        } else {
-          enriched = await enrichListing(listing, { llm, qualifyConfig: nicheConfig.qualify })
+        try {
+          if (isFixture) {
+            enriched = enrichFromFixture(listing)
+          } else {
+            enriched = await enrichListing(listing, { llm, qualifyConfig: nicheConfig.qualify })
+          }
+        } catch (enrichErr) {
+          const msg = (enrichErr as Error).message || ''
+
+          // Auth/credit errors → abort the entire batch (fundamental config issue)
+          if (msg.includes('credit balance') || msg.includes('401') || msg.includes('authentication') || msg.includes('api_key')) {
+            console.error(`\n    ❌ FATAL: ${msg.slice(0, 120)}`)
+            console.error('    Pipeline aborting — fix API credentials/credits before re-running.\n')
+            throw enrichErr
+          }
+
+          // Transient failure → log, skip this prospect, continue batch
+          console.error(`    [enrich] ERROR (skipping): ${msg.slice(0, 100)}`)
+          stats.enrichment_failures = (stats.enrichment_failures || 0) + 1
+          if (existingId && supabase) {
+            await recordEvent(existingId, 'enrichment_failed', {
+              error: msg.slice(0, 200),
+              actor: 'pipeline',
+            }).catch(() => {})  // don't let event logging crash the recovery path
+          }
+          continue
         }
 
         if (!enriched) {
@@ -572,6 +594,9 @@ async function main() {
   console.log(`  Outreach: ${stats.outreach}`)
   console.log(`  Skipped (done): ${stats.skipped_done}`)
   console.log(`  Resumed: ${stats.resumed}`)
+  if (stats.enrichment_failures > 0) {
+    console.log(`  ⚠ Enrichment failures: ${stats.enrichment_failures} (see prospect_events for details)`)
+  }
   console.log(`  CSV: ${csvPath}`)
 
   // ── Mockup verification tail ──
