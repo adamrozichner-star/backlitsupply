@@ -498,6 +498,41 @@ export async function getBrokenMockups(): Promise<BrokenMockup[]> {
     .filter((r): r is BrokenMockup => r !== null)
 }
 
+// ─── Poller health ──────────────────────────────────────
+
+export interface PollerStatus {
+  last_run_at: string | null
+  leads_fetched: number
+  state_changes: number
+  is_stale: boolean  // true if last poll > 15 min ago
+}
+
+export async function getPollerStatus(): Promise<PollerStatus> {
+  const sb = getSupabaseServer()
+  if (!sb) return { last_run_at: null, leads_fetched: 0, state_changes: 0, is_stale: true }
+
+  const { data } = await sb
+    .from('prospect_events')
+    .select('created_at, payload')
+    .eq('event', 'poller_run')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (!data) return { last_run_at: null, leads_fetched: 0, state_changes: 0, is_stale: true }
+
+  const payload = data.payload as Record<string, unknown>
+  const lastRunAt = data.created_at
+  const isStale = Date.now() - new Date(lastRunAt).getTime() > 15 * 60 * 1000
+
+  return {
+    last_run_at: lastRunAt,
+    leads_fetched: (payload.leads_fetched as number) || 0,
+    state_changes: (payload.state_changes as number) || 0,
+    is_stale: isStale,
+  }
+}
+
 export async function getNiches(): Promise<string[]> {
   const sb = getSupabaseServer()
   if (!sb) return []

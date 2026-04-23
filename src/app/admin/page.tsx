@@ -1,6 +1,6 @@
 import {
   getFunnelCounts, getProspects, getMetricsTotals,
-  getCostBreakdown, getRecentEvents, getNiches, getBrokenMockups,
+  getCostBreakdown, getRecentEvents, getNiches, getBrokenMockups, getPollerStatus,
 } from '@/lib/admin/queries'
 import { MetricCard } from '@/components/admin/MetricCard'
 import { FunnelChart } from '@/components/admin/FunnelChart'
@@ -17,7 +17,7 @@ export default async function AdminDashboard({
   const sp = await searchParams
   const nicheFilter = sp.niche
 
-  const [metrics, funnel, prospects, costs, events, niches, broken] = await Promise.all([
+  const [metrics, funnel, prospects, costs, events, niches, broken, poller] = await Promise.all([
     getMetricsTotals(),
     getFunnelCounts(),
     getProspects(nicheFilter ? { niche: nicheFilter } : {}),
@@ -25,6 +25,7 @@ export default async function AdminDashboard({
     getRecentEvents(20),
     getNiches(),
     getBrokenMockups(),
+    getPollerStatus(),
   ])
 
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`
@@ -33,6 +34,18 @@ export default async function AdminDashboard({
     <div className="space-y-6">
       {/* Health banner (only renders if broken mockups exist) */}
       <HealthBanner broken={broken} />
+
+      {/* Poller status */}
+      {poller.is_stale && poller.last_run_at && (
+        <div className="border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-xs text-yellow-300">
+          ⚠ Instantly poller is stale — last run {new Date(poller.last_run_at).toLocaleString()}. Check cron or run <code className="text-yellow-200">npm run poll-instantly</code> manually.
+        </div>
+      )}
+      {!poller.last_run_at && (
+        <div className="border border-white/[0.06] bg-white/5 px-4 py-3 text-xs text-white/40">
+          Instantly poller has not run yet. First poll will trigger after campaign sends begin.
+        </div>
+      )}
 
       {/* Metrics row */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
