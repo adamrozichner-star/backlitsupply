@@ -85,3 +85,10 @@ Corrections and patterns to avoid. Updated after every mistake.
 - **Fix 1**: TERMINAL_SEND_STATES ceiling in version comparison — prospects at sent/opened/replied/positive/booked/won/lost/dead are never re-enriched. The email is already sent; re-enriching is pointless.
 - **Fix 2**: Push script send-history guard — queries prospect_events for any prior `state:sent` or `instantly_lead_created` event. Skips prospects with send history regardless of current state or instantly_lead_id. Belt + suspenders.
 - **Lesson**: Any pipeline operation that resets state (version bumps, manual resets, bug fixes) must have a "point of no return" check. Once an email is sent, that prospect's state must only move forward.
+
+## Role-based email dominance on fitness/dental (2026-04-23)
+- Pre-push batch of 14 prospects: 11 of 14 emails (79%) are role-based (info@, hello@, studio@). Above the 70% flag threshold.
+- Worst niches: fitness (nearly all info@/hello@) and dental (100% info@).
+- Med-spa is the only niche with meaningful personal email hit rate from Hunter.
+- Phase 7E should either deprioritize Tier 3 role-based emails or add a review-queue warning when a prospect's email is role-based, so the reviewer can decide whether the mockup is worth the send.
+- Tracked via `email_is_role_based` flag for reply-rate analysis after first sends land.
