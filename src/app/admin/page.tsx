@@ -1,6 +1,6 @@
 import {
   getFunnelCounts, getProspects, getMetricsTotals,
-  getCostBreakdown, getRecentEvents, getNiches, getBrokenMockups, getPollerStatus,
+  getCostBreakdown, getRecentEvents, getNiches, getBrokenMockups, getPollerStatus, getBounceRate,
 } from '@/lib/admin/queries'
 import { MetricCard } from '@/components/admin/MetricCard'
 import { FunnelChart } from '@/components/admin/FunnelChart'
@@ -17,7 +17,7 @@ export default async function AdminDashboard({
   const sp = await searchParams
   const nicheFilter = sp.niche
 
-  const [metrics, funnel, prospects, costs, events, niches, broken, poller] = await Promise.all([
+  const [metrics, funnel, prospects, costs, events, niches, broken, poller, bounceRate] = await Promise.all([
     getMetricsTotals(),
     getFunnelCounts(),
     getProspects(nicheFilter ? { niche: nicheFilter } : {}),
@@ -26,6 +26,7 @@ export default async function AdminDashboard({
     getNiches(),
     getBrokenMockups(),
     getPollerStatus(),
+    getBounceRate(),
   ])
 
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`
@@ -34,6 +35,18 @@ export default async function AdminDashboard({
     <div className="space-y-6">
       {/* Health banner (only renders if broken mockups exist) */}
       <HealthBanner broken={broken} />
+
+      {/* Bounce rate alert */}
+      {bounceRate.is_critical && bounceRate.sent_24h > 0 && (
+        <div className="border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs">
+          <span className="font-semibold text-red-300">
+            Bounce rate: {(bounceRate.rate * 100).toFixed(1)}%
+          </span>
+          <span className="text-white/60">
+            {' '}— {bounceRate.bounced_24h} of {bounceRate.sent_24h} emails bounced in last 24h. Deliverability risk.
+          </span>
+        </div>
+      )}
 
       {/* Poller status */}
       {poller.is_stale && poller.last_run_at && (

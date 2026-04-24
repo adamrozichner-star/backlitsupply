@@ -507,6 +507,40 @@ export interface PollerStatus {
   is_stale: boolean  // true if last poll > 15 min ago
 }
 
+// ─── Bounce rate (deliverability health) ────────────────
+
+export interface BounceRate {
+  sent_24h: number
+  bounced_24h: number
+  rate: number       // 0-1
+  is_critical: boolean  // true if > 5%
+}
+
+export async function getBounceRate(): Promise<BounceRate> {
+  const sb = getSupabaseServer()
+  if (!sb) return { sent_24h: 0, bounced_24h: 0, rate: 0, is_critical: false }
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { count: sent } = await sb
+    .from('prospect_events')
+    .select('*', { count: 'exact', head: true })
+    .in('event', ['state:sent', 'instantly:email_sent'])
+    .gte('created_at', since)
+
+  const { count: bounced } = await sb
+    .from('prospect_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('event', 'instantly:email_bounced')
+    .gte('created_at', since)
+
+  const s = sent || 0
+  const b = bounced || 0
+  const rate = s > 0 ? b / s : 0
+
+  return { sent_24h: s, bounced_24h: b, rate, is_critical: rate > 0.05 }
+}
+
 export async function getPollerStatus(): Promise<PollerStatus> {
   const sb = getSupabaseServer()
   if (!sb) return { last_run_at: null, leads_fetched: 0, state_changes: 0, is_stale: true }
