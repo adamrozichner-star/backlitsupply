@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: 'We made you a free mockup of your logo as a premium backlit sign. See it before you commit.',
     openGraph: {
       title: `${prospect.business_name} × Backlit Supply`,
-      images: [prospect.mockup_url || '/work/sign-06.webp'],
+      images: [prospect.mockup_url || '/mockups/brickell-yoga-miami.webp'],
     },
   }
 }

@@ -1,11 +1,15 @@
-// Full gallery — /work page uses all 7, homepage uses first 6
+// Full gallery — /work page uses all, homepage uses first 6
 export const WORK_GALLERY = [
-  { src: '/work/sign-06.webp', category: 'Hospitality', alt: 'Halo-lit storefront sign mounted on architectural facade at night' },
-  { src: '/work/sign-07.avif', category: 'Luxury Retail', alt: 'Gold halo-lit metal letters on white marble wall' },
+  { src: '/mockups/brickell-yoga-miami.webp', category: 'Yoga Studio, Miami', alt: 'Backlit infinity logo and wordmark on exposed brick wall' },
+  { src: '/mockups/rejuvenate-austin-austin.webp', category: 'Wellness Spa, Austin', alt: 'Halo-lit ornamental logo and wordmark on dark concrete wall' },
   { src: '/work/sign-01.avif', category: 'Wellness & Medical', alt: 'Halo-lit logo and wordmark on grey wellness studio wall' },
+  { src: '/mockups/agni-miami-miami.webp', category: 'Fitness Studio, Miami', alt: 'Warm halo-lit logo and letters on exposed brick wall' },
   { src: '/work/sign-02.avif', category: 'Restaurants & Bars', alt: 'Warm halo-lit metal letters on outdoor restaurant wall at dusk' },
+  { src: '/mockups/silver-garden-pole-and-yoga-studio-miami.webp', category: 'Yoga Studio, Miami', alt: 'Backlit sculptural logo on exposed brick wall' },
   { src: '/work/sign-08.avif', category: 'Hotels & Lobbies', alt: 'Gold halo-lit signature lettering on veined marble lobby wall' },
+  { src: '/mockups/aesthetica-med-spa-austin.webp', category: 'Med Spa, Austin', alt: 'Halo-lit monogram logo on dark concrete storefront' },
   { src: '/work/sign-04.avif', category: 'Studios & Concept Spaces', alt: 'Black halo-lit metal letters on raw concrete studio wall' },
+  { src: '/mockups/maison-yoga-miami-miami.webp', category: 'Yoga Studio, Miami', alt: 'Warm backlit wordmark with flower on brick wall' },
   { src: '/work/sign-03.avif', category: "Restaurants & Caf\u00e9s", alt: 'Warm halo-lit metal letters on veranda restaurant exterior at night' },
 ] as const
 

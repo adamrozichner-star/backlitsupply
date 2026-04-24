@@ -4,7 +4,7 @@ import LeadForm from '@/components/LeadForm'
 export const metadata: Metadata = {
   title: 'Contact',
   description: 'Get a free mockup of your custom backlit sign or ask us anything. We respond within hours, not days.',
-  openGraph: { images: ['/work/sign-06.webp'] },
+  openGraph: { images: ['/mockups/brickell-yoga-miami.webp'] },
 }
 
 export default function ContactPage() {
@@ -36,17 +36,23 @@ export default function ContactPage() {
           <div className="space-y-8">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/30">Email</p>
-              <a href="mailto:adam@backlitsupply.com" className="text-sm text-white transition-colors hover:text-amber-500">
-                adam@backlitsupply.com
+              <a href="mailto:hello@gotbacklit.com" className="text-sm text-white transition-colors hover:text-amber-500">
+                hello@gotbacklit.com
+              </a>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/30">WhatsApp</p>
+              <a href="https://wa.me/15122701730" className="text-sm text-white transition-colors hover:text-amber-500">
+                Message us on WhatsApp
               </a>
             </div>
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/30">Response time</p>
-              <p className="text-sm text-white/60">Within 4 hours during business days</p>
+              <p className="text-sm text-white/60">We respond within hours, not days.</p>
             </div>
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/30">Location</p>
-              <p className="text-sm text-white/60">Manufacturing partner in Asia, ships worldwide. Customer support based in Israel.</p>
+              <p className="text-sm text-white/60">Based in the US. Ships worldwide.</p>
             </div>
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/30">Etsy</p>

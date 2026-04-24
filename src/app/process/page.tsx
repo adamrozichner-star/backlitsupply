@@ -4,8 +4,8 @@ import { ArrowRight, UploadSimple, Sparkle, ChatCircleText, Truck } from '@phosp
 
 export const metadata: Metadata = {
   title: 'How It Works',
-  description: 'From logo upload to doorstep delivery in 10 days. See how Backlit Supply builds custom backlit LED signs with AI-powered mockups and unlimited revisions.',
-  openGraph: { images: ['/work/sign-06.webp'] },
+  description: 'From logo upload to doorstep delivery in 10 days. See how Backlit Supply builds custom backlit LED signs with free mockups and unlimited revisions.',
+  openGraph: { images: ['/mockups/brickell-yoga-miami.webp'] },
 }
 
 const STEPS = [
@@ -19,13 +19,13 @@ const STEPS = [
     num: '02',
     title: 'See your sign before you buy it',
     icon: Sparkle,
-    copy: "Within minutes, our AI renders your logo as a real backlit sign \u2014 composited onto the kind of wall, surface, or storefront you'd actually mount it on. You see exactly what you'll get. No deposit, no commitment.",
+    copy: "Within 24 hours, we render your logo as a real backlit sign \u2014 on the kind of wall, surface, or storefront you'd actually mount it on. You see exactly what you'll get. No deposit, no commitment.",
   },
   {
     num: '03',
     title: "Refine until it's perfect",
     icon: ChatCircleText,
-    copy: 'Want it bigger? Different color? Ask us anything \u2014 our AI assistant knows our entire catalog, materials, and shipping, and answers in seconds, 24/7. Unlimited revisions until you\'re happy. Real humans take over for anything complex, same day.',
+    copy: 'Want it bigger? Different color? Message us directly. We respond within hours during business days. Unlimited revisions until you\'re happy.',
   },
   {
     num: '04',
@@ -39,7 +39,7 @@ const COMPARISON = [
   { label: 'First mockup', traditional: '3\u20137 days', us: 'Minutes' },
   { label: 'Revisions', traditional: 'Email chains', us: 'Live, unlimited' },
   { label: 'Quoting', traditional: 'Phone, PDFs, back-and-forth', us: 'One click' },
-  { label: 'Support', traditional: 'Business hours', us: '24/7 AI + human' },
+  { label: 'Support', traditional: 'Business hours', us: 'Same-day response' },
   { label: 'Delivery', traditional: '4\u20138 weeks', us: '10 days' },
   { label: 'Pricing', traditional: '\u201CContact us\u201D', us: 'Public, on-site' },
 ]
@@ -55,7 +55,7 @@ export default function ProcessPage() {
             Your sign, ready in days. Not weeks.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-white/40">
-            Most sign shops take 4&ndash;8 weeks of email back-and-forth before you even see what you&apos;re paying for. We use AI to compress that into days &mdash; so you can decide, approve, and ship without the wait.
+            Most sign shops take 4&ndash;8 weeks of email back-and-forth before you even see what you&apos;re paying for. We compress that into days &mdash; so you can decide, approve, and ship without the wait.
           </p>
         </div>
       </section>

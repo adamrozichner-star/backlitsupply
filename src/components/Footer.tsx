@@ -39,8 +39,8 @@ export default function Footer() {
             <div>
               <p className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">Contact</p>
               <div className="flex flex-col gap-2 text-[13px] text-white/40">
-                <a href="mailto:adam@backlitsupply.com" className="transition-colors hover:text-white">
-                  adam@backlitsupply.com
+                <a href="mailto:hello@gotbacklit.com" className="transition-colors hover:text-white">
+                  hello@gotbacklit.com
                 </a>
               </div>
             </div>

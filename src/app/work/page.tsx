@@ -7,7 +7,7 @@ import { ArrowRight } from '@phosphor-icons/react/dist/ssr'
 export const metadata: Metadata = {
   title: 'Our Work',
   description: 'Browse our portfolio of custom backlit LED signs. Premium signage for hospitality, retail, wellness, restaurants, hotels, and more.',
-  openGraph: { images: ['/work/sign-06.webp'] },
+  openGraph: { images: ['/mockups/brickell-yoga-miami.webp'] },
 }
 
 export default function WorkPage() {

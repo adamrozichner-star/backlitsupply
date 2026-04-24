@@ -7,7 +7,7 @@ export default function HeroBackground() {
     <div className="absolute inset-0 -z-10 overflow-hidden">
       {/* Background image */}
       <Image
-        src="/work/sign-06.webp"
+        src="/mockups/brickell-yoga-miami.webp"
         alt=""
         fill
         priority

@@ -7,7 +7,7 @@ import { FAQ } from '@/lib/faq'
 export const metadata: Metadata = {
   title: 'Pricing',
   description: 'Custom backlit LED signs starting at $385. Transparent pricing, no hidden fees. See our three tiers: Compact, Standard, and Statement.',
-  openGraph: { images: ['/work/sign-06.webp'] },
+  openGraph: { images: ['/mockups/brickell-yoga-miami.webp'] },
 }
 
 export default function PricingPage() {
