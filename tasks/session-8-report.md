@@ -38,25 +38,46 @@
 
 ## Test results
 
-### Test harness (`npm run test:reply -- rejuvenate-austin-austin`)
+### Test 1: Reply classification + Telegram notification
+- **Command**: `npm run test:reply -- rejuvenate-austin-austin`
 - Prospect: Rejuvenate Austin (Jessica), state: sent
 - Test body: "Hi Adam, this looks great — how much for a 36 inch backlit sign installed?"
 - Haiku classification: **PRICING_QUESTION** (correct)
-- Telegram notification: **sent, msg_id=5**
-- dryRun: no reply_classified event logged (verified)
-- No state mutation (prospect remains at 'sent')
-- Total time: 4.0s
+- Telegram notification: **sent, msg_id=7**
+- dryRun verified: no reply_classified event logged, prospect state unchanged at 'sent'
+- Total time: 3.9s
 
-### Callback test
-- Pending: Adam to tap "Mark Handled" in Telegram group
-- Expected: message edits, reply_handled event logged, webhook returns 200
+### Test 2: "Mark Handled" callback (PASSED)
+- Adam tapped "Mark Handled" on msg_id=7 in Telegram group
+- Webhook endpoint: POST /api/webhooks/telegram → 200
+- Message edited: button changed to "Handled by Adam"
+- Supabase event logged:
+  ```
+  event: reply_handled
+  handler_name: Adam
+  handler_telegram_id: 378433018
+  message_id: 7
+  created_at: 2026-04-24T20:47:06.678566+00:00
+  ```
 
-### Serverless path verification
+### Test 3: Webhook security (PASSED)
+- Request without secret header → 403 Forbidden
+- Request with correct secret header + empty body → 200 OK (no-op)
+- Request with correct secret + valid callback → 200 + event logged
+
+### Test 4: Serverless path verification (PASSED)
 - Import chain: cron-job.org → GET /api/cron/poll-instantly → pollInstantly() → handleReply()
 - handleReply imported from @/lib/reply-handler (line 8 of serverless poller)
 - Call site: line 166, inside shouldAdvance('replied') guard, wrapped in try/catch
 - Same shared module as CLI poller and test script
 - Next.js build passes with all routes present
+
+### Bug found and fixed during testing
+- First "Mark Handled" tap returned 404 — Vercel hadn't deployed yet
+- Second tap hit deployed endpoint but `reply_handled` event not logged
+- Root cause: webhook route called Telegram API before Supabase insert; if Telegram errored, Supabase was never reached
+- Fix: reordered to log Supabase event FIRST, then respond to Telegram in try/catch
+- Commit: `fix: webhook logs Supabase event before Telegram API calls`
 
 ## Known gaps / edge cases
 
