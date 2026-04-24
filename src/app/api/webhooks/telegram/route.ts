@@ -65,25 +65,7 @@ export async function POST(req: NextRequest) {
 
   const fromFirstName = (from.first_name as string) || 'Unknown'
 
-  // Answer callback (removes loading spinner)
-  await fetch(`${API_BASE}/bot${token}/answerCallbackQuery`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callback_query_id: callbackQueryId, text: '\u2705 Marked as handled' }),
-  })
-
-  // Edit button to show who handled it
-  await fetch(`${API_BASE}/bot${token}/editMessageReplyMarkup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: { inline_keyboard: [[{ text: `\u2705 Handled by ${fromFirstName}`, callback_data: 'noop' }]] },
-    }),
-  })
-
-  // Log event in Supabase
+  // Log event in Supabase FIRST (most important side effect)
   const sb = getSupabaseServer()
   if (sb) {
     await sb.from('prospect_events').insert({
@@ -96,6 +78,27 @@ export async function POST(req: NextRequest) {
         actor: 'telegram_callback',
       },
     })
+  }
+
+  // Respond to Telegram (best-effort — don't let failures block the response)
+  try {
+    await fetch(`${API_BASE}/bot${token}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text: '\u2705 Marked as handled' }),
+    })
+
+    await fetch(`${API_BASE}/bot${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: [[{ text: `\u2705 Handled by ${fromFirstName}`, callback_data: 'noop' }]] },
+      }),
+    })
+  } catch (err) {
+    console.error('[telegram-webhook] Telegram API error:', (err as Error).message?.slice(0, 100))
   }
 
   return NextResponse.json({ ok: true })
