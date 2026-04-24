@@ -14,7 +14,9 @@
     "push-instantly": "tsx scripts/push-to-instantly.ts",
     "poll-instantly": "tsx scripts/lib/instantly-poller.ts",
     "loop": "tsx scripts/run-loop.ts",
-    "test:pipeline": "tsx scripts/test-pipeline.ts"
+    "test:pipeline": "tsx scripts/test-pipeline.ts",
+    "setup:telegram": "tsx scripts/setup-telegram.ts",
+    "test:reply": "tsx scripts/test-reply-notification.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

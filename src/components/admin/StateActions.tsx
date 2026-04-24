@@ -7,7 +7,7 @@ import { StateBadge } from './StateBadge'
 import { updateProspectState, approveProspectMockup, rejectProspectMockup, type RejectReason } from '@/lib/admin/actions'
 
 // State machine: what transitions are available from each state
-const ACTIONS: Record<PipelineState, Array<{ label: string; to: PipelineState; variant: 'primary' | 'danger' | 'ghost' }>> = {
+const ACTIONS: Record<PipelineState, Array<{ label: string; to: PipelineState; variant: 'primary' | 'danger' | 'ghost'; reason?: string }>> = {
   discovered: [],
   enriched: [],
   qualified: [],
@@ -26,7 +26,8 @@ const ACTIONS: Record<PipelineState, Array<{ label: string; to: PipelineState; v
     { label: 'Mark as Lost', to: 'lost', variant: 'danger' },
   ],
   replied: [
-    { label: 'Mark as Positive', to: 'positive', variant: 'primary' },
+    { label: 'Quote Sent', to: 'positive', variant: 'primary', reason: 'quote_sent' },
+    { label: 'In Conversation', to: 'positive', variant: 'primary', reason: 'in_conversation' },
     { label: 'Mark as Lost', to: 'lost', variant: 'danger' },
   ],
   positive: [
@@ -174,8 +175,8 @@ export function StateActions({
         <div className="flex flex-wrap gap-2">
           {actions.map(action => (
             <button
-              key={action.to}
-              onClick={() => handleAction(action.to, action.label)}
+              key={action.reason || action.to}
+              onClick={() => handleAction(action.to, action.label, action.reason)}
               disabled={pending}
               className={`px-3 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLS[action.variant]}`}
             >

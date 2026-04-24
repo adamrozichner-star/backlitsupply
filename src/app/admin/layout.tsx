@@ -36,6 +36,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               )}
             </Link>
             <Link
+              href="/admin/replies"
+              className="text-xs text-white/40 transition-colors hover:text-amber-500"
+            >
+              Replies
+            </Link>
+            <Link
               href="/admin/niches"
               className="text-xs text-white/40 transition-colors hover:text-amber-500"
             >

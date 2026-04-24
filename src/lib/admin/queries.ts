@@ -604,3 +604,66 @@ export async function getNiches(): Promise<string[]> {
   if (!data) return []
   return [...new Set(data.map(r => r.niche as string).filter(Boolean))].sort()
 }
+
+// ─── Replies ────────────────────────────────────────────
+
+export interface ReplyItem {
+  id: string
+  slug: string | null
+  business_name: string | null
+  owner_first_name: string | null
+  niche: string | null
+  city: string | null
+  phone: string | null
+  pipeline_state: PipelineState | null
+  days_in_state: number
+  classification: string | null
+  classification_emoji: string | null
+  suggested_response: string | null
+  reply_body: string | null
+  classified_at: string | null
+}
+
+export async function getReplies(): Promise<ReplyItem[]> {
+  const sb = getSupabaseServer()
+  if (!sb) return []
+
+  const { data: prospects } = await sb.from('prospects')
+    .select('id, slug, business_name, owner_first_name, niche, city, phone, pipeline_state, days_in_state')
+    .in('pipeline_state', ['replied', 'positive'])
+    .order('days_in_state', { ascending: false })
+
+  if (!prospects || prospects.length === 0) return []
+
+  const ids = prospects.map(p => p.id)
+  const { data: events } = await sb.from('prospect_events')
+    .select('prospect_id, payload, created_at')
+    .in('prospect_id', ids)
+    .eq('event', 'reply_classified')
+    .order('created_at', { ascending: false })
+
+  const classificationMap = new Map<string, { payload: Record<string, unknown>; created_at: string }>()
+  for (const e of events || []) {
+    if (e.prospect_id && !classificationMap.has(e.prospect_id)) {
+      classificationMap.set(e.prospect_id, { payload: e.payload as Record<string, unknown>, created_at: e.created_at })
+    }
+  }
+
+  const EMOJI: Record<string, string> = {
+    PRICING_QUESTION: '💰', INTERESTED: '🟢', NOT_INTERESTED: '🔴',
+    AUTO_REPLY: '🤖', SPAM: '🚫', QUESTION: '❓', OTHER: '🔵',
+  }
+
+  return prospects.map(p => {
+    const cls = classificationMap.get(p.id)
+    const classification = (cls?.payload?.classification as string) || null
+    return {
+      ...p,
+      classification,
+      classification_emoji: classification ? (EMOJI[classification] || '🔵') : null,
+      suggested_response: (cls?.payload?.suggested_response as string) || null,
+      reply_body: (cls?.payload?.reply_body as string) || null,
+      classified_at: cls?.created_at || null,
+    }
+  })
+}

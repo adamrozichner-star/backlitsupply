@@ -5,6 +5,7 @@
  */
 
 import { getSupabaseServer } from '@/lib/supabase/server'
+import { handleReply } from '@/lib/reply-handler'
 
 const BASE_URL = 'https://api.instantly.ai'
 
@@ -160,6 +161,13 @@ export async function pollInstantly(): Promise<PollSummary> {
         await sb.from('prospect_events').insert({ prospect_id: prospect.id, event: 'state:replied', payload: { from: currentState, to: 'replied', reason: 'email_replied', replied_variant: lead.email_replied_variant, actor: 'instantly_poller' } })
         summary.state_changes++
         summary.details.push(`${prospect.slug}: → replied`)
+
+        try {
+          await handleReply(prospect.id, lead.id, lead.email_replied_variant ?? undefined)
+        } catch (err) {
+          console.error(`[poller] Reply handler failed for ${prospect.slug}:`, (err as Error).message?.slice(0, 120))
+          summary.errors++
+        }
         continue
       }
 

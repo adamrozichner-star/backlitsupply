@@ -29,6 +29,7 @@ import { resolve } from 'path'
 config({ path: resolve(__dirname, '../../.env.local') })
 
 import { getSupabaseServer } from '../../src/lib/supabase/server'
+import { handleReply } from '../../src/lib/reply-handler'
 
 const CAMPAIGN_ID = process.env.INSTANTLY_CAMPAIGN_ID
 const API_KEY = process.env.INSTANTLY_API_KEY
@@ -245,6 +246,14 @@ async function processLead(
       await logEvent(sb, prospect.id, 'state:replied', { from: currentState, to: 'replied', reason: 'email_replied', actor: 'instantly_poller' })
       summary.state_changes++
       summary.details.push(`${prospect.slug}: ${currentState} → replied`)
+
+      // Fire reply handler async — don't block poll loop
+      try {
+        await handleReply(prospect.id, lead.id, lead.email_replied_variant ?? undefined)
+      } catch (err) {
+        console.error(`[poller] Reply handler failed for ${prospect.slug}:`, (err as Error).message?.slice(0, 120))
+        summary.errors++
+      }
     }
     return
   }
