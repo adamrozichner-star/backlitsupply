@@ -26,14 +26,14 @@ export default function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-[13px] text-white/50 transition-colors hover:text-white"
+              className="text-sm text-white/50 transition-colors hover:text-white"
             >
               {link.label}
             </Link>
           ))}
           <Link
             href="/contact"
-            className="bg-amber-500 px-3.5 py-1.5 text-[13px] font-medium text-black transition-colors hover:bg-amber-400"
+            className="bg-amber-500 px-3.5 py-1.5 text-sm font-medium text-black transition-colors hover:bg-amber-400"
           >
             Get a free mockup
           </Link>

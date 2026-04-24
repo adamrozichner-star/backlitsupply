@@ -7,8 +7,9 @@ export const SITE_URL = 'https://backlitsupply.com'
 export const CALENDLY_URL = '#' // TODO: Replace with real Calendly link
 
 export const NAV_LINKS = [
-  { href: '/work', label: 'Work' },
-  { href: '/process', label: 'Process' },
+  { href: '/work', label: 'Our Work' },
+  { href: '/process', label: 'How It Works' },
   { href: '/pricing', label: 'Pricing' },
+  { href: '/factory', label: 'Our Factory' },
   { href: '/contact', label: 'Contact' },
 ] as const

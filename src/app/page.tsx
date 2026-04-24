@@ -20,30 +20,24 @@ export default function Home() {
   return (
     <div className="pb-20 md:pb-0">
       {/* ── Hero ────────────────────────────────── */}
-      <section className="relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-5 py-24">
+      <section className="relative flex min-h-[100vh] items-center justify-center px-5">
         <HeroBackground />
-        <div className="relative mx-auto max-w-2xl text-center">
-          <h1 className="text-4xl font-semibold leading-[1.15] tracking-tight text-white sm:text-5xl md:text-6xl">
+        <div className="relative mx-auto max-w-3xl text-center">
+          <h1 className="text-5xl font-bold leading-[1.1] tracking-tight text-white sm:text-6xl md:text-7xl">
             Your logo. Lit up.
             <br />
-            <span className="text-amber-500">In 10 days.</span>
+            <span className="text-amber-500">In ten days.</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-white/40 sm:text-lg">
-            Custom backlit LED signs for modern businesses. Handcrafted, shipped to your door. Starting at $385.
+          <p className="mx-auto mt-6 max-w-md text-lg leading-relaxed text-white/50">
+            Free mockup, no deposit, US-based team.
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <div className="mt-10">
             <Link
               href="/contact"
-              className="flex items-center gap-2 bg-amber-500 px-6 py-3 text-sm font-medium text-black transition-colors hover:bg-amber-400"
+              className="inline-flex items-center gap-2 bg-amber-500 px-8 py-4 text-base font-semibold text-black transition-colors hover:bg-amber-400"
             >
-              Get a free mockup of your logo
-              <ArrowRight size={16} weight="bold" />
-            </Link>
-            <Link
-              href="/work"
-              className="text-sm text-white/40 transition-colors hover:text-white"
-            >
-              See our work
+              Get a free mockup
+              <ArrowRight size={18} weight="bold" />
             </Link>
           </div>
         </div>
