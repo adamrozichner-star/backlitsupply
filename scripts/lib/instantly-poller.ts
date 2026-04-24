@@ -201,17 +201,22 @@ async function processLead(
 ): Promise<void> {
   const currentState = prospect.pipeline_state || 'mockup_ready'
 
-  // Bounced
-  if (lead.status === -1) {
-    if (shouldAdvance(currentState, 'dead')) {
-      await sb.from('prospects').update({ pipeline_state: 'dead' }).eq('id', prospect.id)
-      await logEvent(sb, prospect.id, 'instantly:email_bounced', { from: currentState, to: 'dead' })
-      await logEvent(sb, prospect.id, 'state:dead', { from: currentState, to: 'dead', reason: 'email_bounced', actor: 'instantly_poller' })
-      summary.state_changes++
-      summary.details.push(`${prospect.slug}: ${currentState} → dead (bounced)`)
-    }
+  // Bounced — preserve record, don't auto-kill to dead.
+  // Soft bounces (mailbox full) are retryable. Hard bounces (invalid) are not.
+  // Instantly API doesn't expose bounce reason, so we default to unknown.
+  if (lead.status === -1 && currentState !== 'dead' && currentState !== 'lost' && currentState !== 'bounced') {
+    await sb.from('prospects').update({ pipeline_state: 'bounced' as string }).eq('id', prospect.id)
+    await logEvent(sb, prospect.id, 'instantly:email_bounced', {
+      from: currentState, to: 'bounced',
+      bounce_type: 'unknown',
+      esp_code: (lead as Record<string, unknown>).esp_code ?? null,
+    })
+    await logEvent(sb, prospect.id, 'state:bounced', { from: currentState, to: 'bounced', reason: 'email_bounced', actor: 'instantly_poller' })
+    summary.state_changes++
+    summary.details.push(`${prospect.slug}: ${currentState} → bounced`)
     return
   }
+  if (lead.status === -1) return  // already at bounced/dead/lost
 
   // Unsubscribed
   if (lead.status === -2) {

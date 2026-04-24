@@ -55,7 +55,7 @@ function isValidEmail(email: string | null | undefined): boolean {
 // Pipeline state ordering — used to determine which stages to skip on resume
 const STATE_ORDER = [
   'discovered', 'enriched', 'qualified', 'mockup_review_pending', 'mockup_ready',
-  'sent', 'opened', 'replied', 'positive', 'booked', 'won', 'lost', 'dead',
+  'sent', 'opened', 'replied', 'positive', 'booked', 'won', 'bounced', 'lost', 'dead',
 ] as const
 
 function stateIndex(state: string): number {
@@ -253,7 +253,7 @@ async function main() {
           // Check enrichment version — force re-enrich if stale
           // CEILING: never re-enrich prospects at sent or later — the email is already
           // delivered. Re-enriching would regress state and risk duplicate sends.
-          const TERMINAL_SEND_STATES = ['sent', 'opened', 'replied', 'positive', 'booked', 'won', 'lost', 'dead']
+          const TERMINAL_SEND_STATES = ['sent', 'opened', 'replied', 'positive', 'booked', 'won', 'bounced', 'lost', 'dead']
           if (isAtOrPast(currentState, 'enriched') && existingVersion < CURRENT_ENRICHMENT_VERSION) {
             if (TERMINAL_SEND_STATES.includes(currentState)) {
               console.log(`    [version] Skipping re-enrichment — prospect at '${currentState}' (terminal send state). v${existingVersion} → v${CURRENT_ENRICHMENT_VERSION} would regress.`)

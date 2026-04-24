@@ -36,14 +36,24 @@ export default async function AdminDashboard({
       {/* Health banner (only renders if broken mockups exist) */}
       <HealthBanner broken={broken} />
 
-      {/* Bounce rate alert */}
-      {bounceRate.is_critical && bounceRate.sent_24h > 0 && (
+      {/* Bounce rate alerts — hard bounces (red) vs soft bounces (yellow info) */}
+      {bounceRate.is_hard_critical && bounceRate.sent_24h > 0 && (
         <div className="border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs">
           <span className="font-semibold text-red-300">
-            Bounce rate: {(bounceRate.rate * 100).toFixed(1)}%
+            Hard bounce rate: {(bounceRate.hard_rate * 100).toFixed(1)}%
           </span>
           <span className="text-white/60">
-            {' '}— {bounceRate.bounced_24h} of {bounceRate.sent_24h} emails bounced in last 24h. Deliverability risk.
+            {' '}— {bounceRate.hard_bounces} hard bounce{bounceRate.hard_bounces === 1 ? '' : 's'} of {bounceRate.sent_24h} emails in last 24h. Deliverability risk.
+          </span>
+        </div>
+      )}
+      {bounceRate.has_soft_bounces && bounceRate.sent_24h > 0 && (
+        <div className="border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-xs">
+          <span className="text-yellow-300">
+            {bounceRate.soft_bounces} soft bounce{bounceRate.soft_bounces === 1 ? '' : 's'}
+          </span>
+          <span className="text-white/40">
+            {' '}(mailbox full, greylisting) in last 24h — not a deliverability signal.
           </span>
         </div>
       )}

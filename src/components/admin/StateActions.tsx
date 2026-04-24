@@ -38,6 +38,10 @@ const ACTIONS: Record<PipelineState, Array<{ label: string; to: PipelineState; v
     { label: 'Mark as Lost', to: 'lost', variant: 'danger' },
   ],
   won: [],
+  bounced: [
+    { label: 'Mark as Lost (hard bounce)', to: 'lost', variant: 'danger' },
+    { label: 'Reactivate to Discovered', to: 'discovered', variant: 'ghost' },
+  ],
   lost: [
     { label: 'Reactivate to Discovered', to: 'discovered', variant: 'ghost' },
   ],

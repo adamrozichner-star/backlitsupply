@@ -7,12 +7,12 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 
 export type PipelineState =
   | 'discovered' | 'enriched' | 'qualified' | 'mockup_review_pending' | 'mockup_ready'
-  | 'sent' | 'opened' | 'replied' | 'positive' | 'booked' | 'won' | 'lost' | 'dead'
+  | 'sent' | 'opened' | 'replied' | 'positive' | 'booked' | 'won' | 'bounced' | 'lost' | 'dead'
 
 export const PIPELINE_STATES: PipelineState[] = [
   'discovered', 'enriched', 'qualified', 'mockup_review_pending', 'mockup_ready',
   'sent', 'opened', 'replied', 'positive', 'booked', 'won',
-  'lost', 'dead',
+  'bounced', 'lost', 'dead',
 ]
 
 export interface AdminProspect {
@@ -512,13 +512,17 @@ export interface PollerStatus {
 export interface BounceRate {
   sent_24h: number
   bounced_24h: number
-  rate: number       // 0-1
-  is_critical: boolean  // true if > 5%
+  hard_bounces: number     // manually classified as hard (→ lost)
+  soft_bounces: number     // mailbox full, greylisting, unknown
+  rate: number             // total bounce rate 0-1
+  hard_rate: number        // hard bounce rate 0-1
+  is_hard_critical: boolean  // true if hard bounce rate > 5%
+  has_soft_bounces: boolean
 }
 
 export async function getBounceRate(): Promise<BounceRate> {
   const sb = getSupabaseServer()
-  if (!sb) return { sent_24h: 0, bounced_24h: 0, rate: 0, is_critical: false }
+  if (!sb) return { sent_24h: 0, bounced_24h: 0, hard_bounces: 0, soft_bounces: 0, rate: 0, hard_rate: 0, is_hard_critical: false, has_soft_bounces: false }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
@@ -528,17 +532,43 @@ export async function getBounceRate(): Promise<BounceRate> {
     .in('event', ['state:sent', 'instantly:email_sent'])
     .gte('created_at', since)
 
-  const { count: bounced } = await sb
+  // All bounces in 24h
+  const { data: bounceEvents } = await sb
     .from('prospect_events')
-    .select('*', { count: 'exact', head: true })
+    .select('prospect_id, payload')
     .eq('event', 'instantly:email_bounced')
     .gte('created_at', since)
 
-  const s = sent || 0
-  const b = bounced || 0
-  const rate = s > 0 ? b / s : 0
+  const totalBounced = bounceEvents?.length || 0
 
-  return { sent_24h: s, bounced_24h: b, rate, is_critical: rate > 0.05 }
+  // Hard bounces: prospects that went from bounced → lost (manually classified)
+  // For now, count prospects at 'lost' state that have a bounce event
+  const bouncedProspectIds = [...new Set((bounceEvents || []).map(e => e.prospect_id))]
+  let hardCount = 0
+  if (bouncedProspectIds.length > 0) {
+    const { count: hardBounced } = await sb
+      .from('prospects')
+      .select('*', { count: 'exact', head: true })
+      .in('id', bouncedProspectIds)
+      .eq('pipeline_state', 'lost')
+    hardCount = hardBounced || 0
+  }
+
+  const s = sent || 0
+  const softCount = totalBounced - hardCount
+  const rate = s > 0 ? totalBounced / s : 0
+  const hardRate = s > 0 ? hardCount / s : 0
+
+  return {
+    sent_24h: s,
+    bounced_24h: totalBounced,
+    hard_bounces: hardCount,
+    soft_bounces: softCount,
+    rate,
+    hard_rate: hardRate,
+    is_hard_critical: hardRate > 0.05,
+    has_soft_bounces: softCount > 0,
+  }
 }
 
 export async function getPollerStatus(): Promise<PollerStatus> {

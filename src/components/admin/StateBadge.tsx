@@ -12,6 +12,7 @@ const COLORS: Record<PipelineState, string> = {
   positive: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   booked: 'bg-green-500/15 text-green-300 border-green-500/30',
   won: 'bg-green-500/25 text-green-200 border-green-400/40',
+  bounced: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
   lost: 'bg-red-500/10 text-red-300 border-red-500/20',
   dead: 'bg-white/[0.03] text-white/20 border-white/5',
 }

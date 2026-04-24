@@ -115,12 +115,33 @@ export async function pollInstantly(): Promise<PollSummary> {
 
       const currentState = prospect.pipeline_state || 'mockup_ready'
 
-      // Bounced
-      if (lead.status === -1 && shouldAdvance(currentState, 'dead')) {
-        await sb.from('prospects').update({ pipeline_state: 'dead' }).eq('id', prospect.id)
-        await sb.from('prospect_events').insert({ prospect_id: prospect.id, event: 'state:dead', payload: { from: currentState, to: 'dead', reason: 'email_bounced', actor: 'instantly_poller' } })
-        summary.state_changes++
-        summary.details.push(`${prospect.slug}: bounced → dead`)
+      // Bounced — preserve record (don't kill to dead).
+      // Soft bounces (mailbox full, greylisting) are retryable; hard bounces
+      // (invalid address) are not. Instantly API doesn't expose bounce reason,
+      // so we log esp_code and default to bounce_type='unknown'. Admin can
+      // manually classify via prospect_events.
+      if (lead.status === -1 && currentState !== 'dead' && currentState !== 'lost') {
+        // Only transition once — don't re-log on every poll
+        if (currentState !== 'bounced') {
+          await sb.from('prospects').update({ pipeline_state: 'bounced' as string }).eq('id', prospect.id)
+          await sb.from('prospect_events').insert({
+            prospect_id: prospect.id,
+            event: 'instantly:email_bounced',
+            payload: {
+              from: currentState, to: 'bounced',
+              bounce_type: 'unknown',
+              esp_code: (lead as Record<string, unknown>).esp_code ?? null,
+              actor: 'instantly_poller',
+            },
+          })
+          await sb.from('prospect_events').insert({
+            prospect_id: prospect.id,
+            event: 'state:bounced',
+            payload: { from: currentState, to: 'bounced', reason: 'email_bounced', actor: 'instantly_poller' },
+          })
+          summary.state_changes++
+          summary.details.push(`${prospect.slug}: ${currentState} → bounced`)
+        }
         continue
       }
 
