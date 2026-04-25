@@ -34,11 +34,37 @@ export default async function ProspectPage({ params }: Props) {
   const hdrs = await headers()
   recordPageView(prospect.id, hdrs.get('user-agent'), hdrs.get('referer'))
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: `Custom Backlit Sign for ${prospect.business_name}`,
+    description: `A premium backlit LED sign featuring the ${prospect.business_name} logo. Precision-cut acrylic with warm LED backlighting.`,
+    image: `https://backlitsupply.com${prospect.mockup_url || '/mockups/brickell-yoga-miami.webp'}`,
+    brand: { '@type': 'Brand', name: 'Backlit Supply' },
+    offers: {
+      '@type': 'AggregateOffer',
+      lowPrice: 385,
+      highPrice: 2000,
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+    },
+  }
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://backlitsupply.com' },
+      { '@type': 'ListItem', position: 2, name: 'Our Work', item: 'https://backlitsupply.com/work' },
+      { '@type': 'ListItem', position: 3, name: prospect.business_name, item: `https://backlitsupply.com/for/${slug}` },
+    ],
+  }
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <ProspectPageView prospect={prospect} />
-      {/* Tracking pixel — writes page_visited event, auto-transitions sent→opened.
-          1h cookie dedupe, bot-filtered server-side. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={`/api/track/visit?slug=${encodeURIComponent(slug)}`}
