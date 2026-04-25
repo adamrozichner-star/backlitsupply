@@ -192,5 +192,13 @@ export async function pollInstantly(): Promise<PollSummary> {
   // Log poller run
   await sb.from('prospect_events').insert({ prospect_id: null, event: 'poller_run', payload: summary })
 
+  // Check bounce rate after poll
+  try {
+    const { checkBounceRate } = await import('@/lib/bounce-monitor')
+    await checkBounceRate()
+  } catch (err) {
+    console.error('[poller] Bounce monitor error:', (err as Error).message?.slice(0, 100))
+  }
+
   return summary
 }
