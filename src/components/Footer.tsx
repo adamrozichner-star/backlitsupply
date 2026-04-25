@@ -37,6 +37,17 @@ export default function Footer() {
               </div>
             </div>
             <div>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">Guides</p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/guides/med-spa-signage"
+                  className="text-[13px] text-white/40 transition-colors hover:text-white"
+                >
+                  Med Spa Signage
+                </Link>
+              </div>
+            </div>
+            <div>
               <p className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">Contact</p>
               <div className="flex flex-col gap-2 text-[13px] text-white/40">
                 <a href="mailto:hello@gotbacklit.com" className="transition-colors hover:text-white">
