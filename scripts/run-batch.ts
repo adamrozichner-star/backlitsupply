@@ -18,7 +18,7 @@ config({ path: resolve(__dirname, '../.env.local') })
 
 import { spawn } from 'child_process'
 import { mkdirSync, existsSync, writeFileSync, createWriteStream } from 'fs'
-import { getNiche } from '../niches'
+import { getNiche, NICHES } from '../niches'
 
 // ─── CLI args ───────────────────────────────────────────
 
@@ -33,13 +33,14 @@ function parseArgs(): Record<string, string> {
 }
 
 const args = parseArgs()
-const nicheList = (args.niches || '').split(',').map(s => s.trim()).filter(Boolean)
+const nicheList = args.niches
+  ? args.niches.split(',').map(s => s.trim()).filter(Boolean)
+  : Object.keys(NICHES)
 const limitPerNiche = args['limit-per-niche'] ? parseInt(args['limit-per-niche'], 10) : 50
 const dryRun = args['dry-run'] === 'true'
 
-if (nicheList.length === 0) {
-  console.error('Usage: npx tsx scripts/run-batch.ts --niches=slug1,slug2 --limit-per-niche=50 [--dry-run]')
-  process.exit(1)
+if (!args.niches) {
+  console.log(`[batch] No --niches specified, running all: ${nicheList.join(', ')}`)
 }
 
 // Validate every niche exists
