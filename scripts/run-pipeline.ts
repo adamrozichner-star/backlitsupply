@@ -184,7 +184,7 @@ async function main() {
   }
 
   let successCount = 0
-  const stats: Record<string, number> = { discovered: 0, enriched: 0, qualified: 0, hunter_found: 0, mockup_gated: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0, enrichment_failures: 0 }
+  const stats: Record<string, number> = { discovered: 0, enriched: 0, qualified: 0, pattern_found: 0, mockup_gated: 0, mockups: 0, outreach: 0, skipped_done: 0, resumed: 0, enrichment_failures: 0 }
   // Track prospect IDs that reached mockup_ready in THIS run (for end-of-pipeline verification)
   const newlyMockupReady: { id: string; slug: string }[] = []
 
@@ -440,34 +440,31 @@ async function main() {
       if (gateEnabled && !isAtOrPast(currentState, 'mockup_review_pending')) {
         const hasOwner = !!enriched.owner_first_name
 
-        // If no email from scraping, try Hunter.io before gating
-        if (!enriched.email && hasOwner && enriched.website && process.env.HUNTER_API_KEY) {
-          const { enrichEmailViaHunter } = await import('./lib/email-enrichment')
-          const hunterResult = await enrichEmailViaHunter(
+        // If no email from scraping, generate pattern-based email
+        if (!enriched.email && enriched.website) {
+          const { enrichEmailViaPattern } = await import('./lib/email-pattern')
+          const patternResult = await enrichEmailViaPattern(
             enriched.website,
             enriched.owner_first_name,
             enriched.owner_last_name,
-            existingId || undefined,
           )
-          if (hunterResult.found && hunterResult.email) {
-            enriched.email = hunterResult.email
-            console.log(`    [hunter] Found email: ${hunterResult.email} (tier ${hunterResult.tier}, confidence ${hunterResult.confidence}${hunterResult.is_role_based ? ', role-based' : ''}${hunterResult.cache_hit ? ', cached' : ''})`)
-            stats.hunter_found++
-            // Persist to prospect row
+          if (patternResult.found && patternResult.email) {
+            enriched.email = patternResult.email
+            stats.pattern_found++
             if (supabase && existingId) {
               await supabase.from('prospects').update({
-                email: hunterResult.email,
-                email_source: 'hunter',
-                email_confidence: hunterResult.confidence,
-                email_is_role_based: hunterResult.is_role_based || false,
+                email: patternResult.email,
+                email_source: 'pattern',
+                email_confidence: patternResult.confidence,
+                email_is_role_based: patternResult.is_role_based || false,
               }).eq('id', existingId)
-              if (hunterResult.is_role_based) {
+              if (patternResult.is_role_based) {
                 await recordEvent(existingId, 'email_low_confidence', {
-                  email: hunterResult.email,
-                  confidence: hunterResult.confidence,
-                  tier: hunterResult.tier,
+                  email: patternResult.email,
+                  confidence: patternResult.confidence,
+                  tier: patternResult.tier,
                   is_role_based: true,
-                  source: 'hunter',
+                  source: 'pattern',
                 })
               }
             }
@@ -601,7 +598,7 @@ async function main() {
   console.log(`  Discovered: ${stats.discovered}`)
   console.log(`  Enriched: ${stats.enriched}`)
   console.log(`  Qualified: ${stats.qualified}`)
-  console.log(`  Hunter emails found: ${stats.hunter_found}`)
+  console.log(`  Pattern emails found: ${stats.pattern_found}`)
   console.log(`  Mockup-gated (no owner/email): ${stats.mockup_gated}`)
   console.log(`  Mockups: ${stats.mockups}`)
   console.log(`  Outreach: ${stats.outreach}`)
