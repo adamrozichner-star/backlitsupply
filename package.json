@@ -17,7 +17,9 @@
     "test:pipeline": "tsx scripts/test-pipeline.ts",
     "setup:telegram": "tsx scripts/setup-telegram.ts",
     "test:reply": "tsx scripts/test-reply-notification.ts",
-    "test:patterns": "tsx scripts/test-email-patterns.ts"
+    "test:patterns": "tsx scripts/test-email-patterns.ts",
+    "convert:factory": "tsx scripts/convert-factory-photos.ts",
+    "test:bounce": "tsx scripts/test-bounce-monitor.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

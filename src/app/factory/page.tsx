@@ -6,7 +6,7 @@ import { ArrowRight } from '@phosphor-icons/react/dist/ssr'
 export const metadata: Metadata = {
   title: 'Our Factory',
   description: 'How we build custom backlit LED signs. Premium materials, precise engineering, and a 10-day turnaround from order to doorstep.',
-  openGraph: { images: ['/mockups/brickell-yoga-miami.webp'] },
+  openGraph: { images: ['/factory/hero.webp'] },
 }
 
 const PROCESS_STEPS = [
@@ -14,25 +14,25 @@ const PROCESS_STEPS = [
     num: '01',
     title: 'Design & engineering',
     copy: 'Your logo is converted into production-ready vector files. Every letter, curve, and detail is mapped for CNC routing and LED placement.',
-    image: '/mockups/aesthetica-med-spa-austin.webp',
+    image: '/factory/step-01.webp',
   },
   {
     num: '02',
     title: 'CNC cutting & shaping',
     copy: 'Individual letters and shapes are precision-cut from 3mm cast acrylic on CNC routers. Each piece is hand-finished to remove tooling marks.',
-    image: '/mockups/rejuvenate-austin-austin.webp',
+    image: '/factory/step-02.webp',
   },
   {
     num: '03',
     title: 'LED assembly & wiring',
     copy: 'Epistar LED strips are fitted behind each letter on an aluminum housing. Every module is wired in parallel with a UL-listed 12V driver for even, reliable illumination.',
-    image: '/mockups/brickell-yoga-miami.webp',
+    image: '/factory/step-03.webp',
   },
   {
     num: '04',
     title: 'Testing & shipping',
     copy: 'Every sign runs a 24-hour burn-in test before packing. Signs ship fully assembled in custom foam crating with tracked international delivery.',
-    image: '/mockups/silver-garden-pole-and-yoga-studio-miami.webp',
+    image: '/factory/step-04.webp',
   },
 ]
 
@@ -65,8 +65,8 @@ export default function FactoryPage() {
       <section className="relative mx-auto max-w-5xl px-5 pb-20">
         <div className="relative aspect-[2/1] w-full overflow-hidden">
           <Image
-            src="/mockups/maison-yoga-miami-miami.webp"
-            alt="Backlit sign with warm halo glow on brick wall"
+            src="/factory/hero.webp"
+            alt="Factory workshop with backlit signs in production"
             fill
             className="object-cover"
             sizes="(max-width: 1280px) 100vw, 1280px"
