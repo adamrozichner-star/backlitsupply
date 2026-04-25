@@ -1,15 +1,16 @@
 /**
  * Bounce rate monitor — runs after every poller cycle.
  *
- * Checks 7-day bounce rate. If >5%, fires Telegram alert (24h dedup).
- * Wired into serverless poller via import.
+ * Only counts prospects with email_source='pattern' to avoid
+ * false positives from pre-pivot Hunter-era bounces.
+ * Alerts via Telegram if hard bounce rate >5% (24h dedup).
  */
 
 import { getSupabaseServer } from '@/lib/supabase/server'
 
 const TELEGRAM_API = 'https://api.telegram.org'
 const WINDOW_DAYS = 7
-const MIN_SAMPLE = 10
+const MIN_SAMPLE = 50
 const WARN_THRESHOLD = 0.03
 const ALERT_THRESHOLD = 0.05
 const DEDUP_HOURS = 24
@@ -28,14 +29,27 @@ export async function checkBounceRate(): Promise<BounceCheckResult> {
 
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
+  // Only count prospects that used pattern-based email enrichment
+  const { data: patternProspects } = await sb.from('prospects')
+    .select('id')
+    .eq('email_source', 'pattern')
+
+  if (!patternProspects || patternProspects.length === 0) {
+    return { sent: 0, bounced: 0, rate: 0, alerted: false, skipped_reason: 'no_pattern_prospects' }
+  }
+
+  const ids = patternProspects.map(p => p.id)
+
   const [sentResult, bouncedResult] = await Promise.all([
     sb.from('prospect_events')
       .select('id', { count: 'exact', head: true })
       .eq('event', 'state:sent')
+      .in('prospect_id', ids)
       .gte('created_at', since),
     sb.from('prospect_events')
       .select('id', { count: 'exact', head: true })
       .eq('event', 'state:bounced')
+      .in('prospect_id', ids)
       .gte('created_at', since),
   ])
 
@@ -49,12 +63,12 @@ export async function checkBounceRate(): Promise<BounceCheckResult> {
   const rate = bounced / sent
 
   if (rate < WARN_THRESHOLD) {
-    console.log(`[bounce-monitor] Healthy: ${(rate * 100).toFixed(1)}% (${bounced}/${sent})`)
+    console.log(`[bounce-monitor] Healthy: ${(rate * 100).toFixed(1)}% (${bounced}/${sent} pattern-email)`)
     return { sent, bounced, rate, alerted: false }
   }
 
   if (rate < ALERT_THRESHOLD) {
-    console.warn(`[bounce-monitor] Warning: ${(rate * 100).toFixed(1)}% (${bounced}/${sent}) — watch zone`)
+    console.warn(`[bounce-monitor] Warning: ${(rate * 100).toFixed(1)}% (${bounced}/${sent} pattern-email) — watch zone`)
     return { sent, bounced, rate, alerted: false }
   }
 
@@ -83,6 +97,7 @@ export async function checkBounceRate(): Promise<BounceCheckResult> {
       bounced,
       sent,
       window_days: WINDOW_DAYS,
+      email_source_filter: 'pattern',
       telegram_sent: alertSent,
       actor: 'bounce_monitor',
     },
@@ -104,10 +119,10 @@ async function sendBounceAlert(rate: number, bounced: number, sent: number): Pro
   const text = [
     `\u{1F6A8} <b>BOUNCE RATE ALERT</b>`,
     '',
-    `Last 7 days: <b>${pct}%</b> (${bounced}/${sent})`,
+    `Last 7 days (pattern emails only): <b>${pct}%</b> (${bounced}/${sent})`,
     `Threshold: &gt;5%`,
     '',
-    `First batch with pattern emails \u2014 investigate before next batch.`,
+    `Investigate bounced prospects before next batch.`,
     '',
     `Check: /admin \u2192 prospects \u2192 filter by bounced`,
   ].join('\n')
