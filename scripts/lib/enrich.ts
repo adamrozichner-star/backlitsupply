@@ -549,6 +549,8 @@ export async function enrichListing(
     logo_width: logo.width,
     logo_height: logo.height,
     logo_extraction_trace: logoTrace as unknown as Record<string, unknown>,
+    rating: listing.rating,
+    review_count: listing.review_count,
     source_slug: listing.source_slug,
     source_id: listing.source_id,
   }
@@ -573,6 +575,8 @@ export function enrichFromFixture(listing: RawListing): EnrichedProspect {
     logo_url: undefined,  // fixture mode uses sample-logo-light.png
     logo_width: 800,
     logo_height: 200,
+    rating: listing.rating || 4.5,
+    review_count: listing.review_count || 50,
     source_slug: listing.source_slug,
     source_id: listing.source_id,
   }

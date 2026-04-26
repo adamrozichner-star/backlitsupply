@@ -229,6 +229,8 @@ async function main() {
       const slug = makeSlug(listing.business_name, listing.city)
       console.log(`\n  ▸ ${listing.business_name} (${slug})`)
 
+      try {
+
       // ── Check existing state (Supabase or file tracker) ──
       let existingId: string | null = null
       let currentState: string = 'new'  // 'new' means not yet in DB
@@ -579,6 +581,15 @@ async function main() {
       // Mark slug as processed (file-based tracker)
       processedSlugs.add(slug)
       successCount++
+
+      } catch (prospectErr) {
+        const msg = (prospectErr as Error).message || String(prospectErr)
+        if (msg.includes('credit balance') || msg.includes('401') || msg.includes('authentication')) {
+          throw prospectErr
+        }
+        console.error(`    [CRASH GUARD] Unexpected error on ${slug}: ${msg.slice(0, 150)}`)
+        stats.enrichment_failures = (stats.enrichment_failures || 0) + 1
+      }
     }
   }
 

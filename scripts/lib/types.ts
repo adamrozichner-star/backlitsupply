@@ -57,6 +57,8 @@ export interface EnrichedProspect {
   logo_width?: number       // validated dimensions
   logo_height?: number
   logo_extraction_trace?: Record<string, unknown>  // v4: full extraction decision trail
+  rating?: number
+  review_count?: number
   niche?: string
   source_slug: string
   source_id?: string

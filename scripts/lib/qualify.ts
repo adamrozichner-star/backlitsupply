@@ -83,43 +83,37 @@ export function qualifyProspect(
   // ── Scoring ──
   const breakdown: Record<string, number> = {}
 
-  // Logo quality (0–25)
-  if (prospect.logo_url) {
-    const w = prospect.logo_width || 0
-    if (w >= 500) breakdown.logo = 25
-    else if (w >= 300) breakdown.logo = 20
-    else if (w >= config.minLogoSize) breakdown.logo = 15
-    else breakdown.logo = 5
-  } else {
-    breakdown.logo = 0
-  }
-
-  // Owner info (0–20)
-  if (prospect.owner_first_name && prospect.owner_last_name) {
-    breakdown.owner = 20
-  } else if (prospect.owner_first_name) {
-    breakdown.owner = 12
-  } else {
-    breakdown.owner = 0
-  }
-
-  // Contact info (0–20)
-  if (prospect.email) {
-    breakdown.contact = 20
-  } else if (prospect.phone) {
-    breakdown.contact = 10
-  } else {
-    breakdown.contact = 0
-  }
-
-  // Website presence (0–20)
+  // Website presence (0–30)
   if (prospect.website) {
-    breakdown.website = 20
+    breakdown.website = 30
   } else if (config.websiteMustExist) {
     breakdown.website = 0
   } else {
     breakdown.website = 5
   }
+
+  // Logo quality (0–30)
+  if (prospect.logo_url) {
+    const w = prospect.logo_width || 0
+    if (w >= 500) breakdown.logo = 30
+    else if (w >= 300) breakdown.logo = 25
+    else if (w >= config.minLogoSize) breakdown.logo = 20
+    else breakdown.logo = 10
+  } else {
+    breakdown.logo = 0
+  }
+
+  // Google rating (0–15)
+  const rating = prospect.rating || 0
+  if (rating >= 4.0) breakdown.rating = 15
+  else if (rating >= 3.5) breakdown.rating = 10
+  else breakdown.rating = 0
+
+  // Review count (0–10)
+  const reviews = prospect.review_count || 0
+  if (reviews >= 20) breakdown.reviews = 10
+  else if (reviews >= 5) breakdown.reviews = 5
+  else breakdown.reviews = 0
 
   // Social presence (0–15)
   if (prospect.instagram) {
