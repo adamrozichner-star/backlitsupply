@@ -13,21 +13,25 @@ import type { LlmClient } from './llm'
 
 const OUTREACH_TOOL = {
   name: 'draft_outreach',
-  description: 'Generate a personalized cold outreach email for a business prospect.',
+  description: 'Generate a personalized cold outreach email body for a business prospect.',
   input_schema: {
     type: 'object' as const,
     properties: {
-      subject: {
-        type: 'string',
-        description: 'Email subject line, under 50 characters. No emoji.',
-      },
       body: {
         type: 'string',
         description: 'Email body, under 75 words. Direct, personal, ends with "worth a look?"',
       },
     },
-    required: ['subject', 'body'],
+    required: ['body'],
   },
+}
+
+let outreachCounter = 0
+
+function pickSubject(businessName: string): { subject: string; variant: string } {
+  const variant = outreachCounter++ % 2 === 0 ? 'A' : 'B'
+  if (variant === 'A') return { subject: 'Made you something', variant }
+  return { subject: `${businessName}, mocked up your logo`, variant }
 }
 
 const ANGLE_PROMPTS: Record<string, string> = {
@@ -63,12 +67,11 @@ export async function generateOutreach(opts: OutreachOptions): Promise<OutreachD
   const personalizedUrl = `https://backlitsupply.com/for/${prospect.slug}`
   const firstName = prospect.owner_first_name || 'there'
 
-  const result = await llm.extract<{ subject: string; body: string }>({
+  const result = await llm.extract<{ body: string }>({
     system: anglePrompt,
-    prompt: `Write a cold outreach email to ${firstName} at ${prospect.business_name}${prospect.city ? ` in ${prospect.city}` : ''}.
+    prompt: `Write a cold outreach email BODY ONLY (no subject line) to ${firstName} at ${prospect.business_name}${prospect.city ? ` in ${prospect.city}` : ''}.
 
 Rules:
-- Subject line under 50 characters, no emoji
 - Body under 75 words
 - Reference their business by name
 - Use their first name "${firstName}"
@@ -80,9 +83,12 @@ Rules:
     toolChoice: 'draft_outreach',
   })
 
+  const { subject, variant } = pickSubject(prospect.business_name)
+  console.log(`    [outreach] Subject variant ${variant}: "${subject}"`)
+
   return {
     slug: prospect.slug,
-    subject: result.input.subject,
+    subject,
     body: result.input.body,
     to_email: prospect.email,
     to_name: firstName,
@@ -100,9 +106,10 @@ export function generateOutreachFixture(prospect: {
   email: string
 }): OutreachDraft {
   const firstName = prospect.owner_first_name || 'there'
+  const { subject } = pickSubject(prospect.business_name)
   return {
     slug: prospect.slug,
-    subject: `${prospect.business_name} — quick mockup`,
+    subject,
     to_email: prospect.email,
     to_name: firstName,
     personalized_url: `https://backlitsupply.com/for/${prospect.slug}`,
