@@ -10,7 +10,7 @@ const config: NicheConfig = {
   // Restaurants don't list owner info on their sites. Revisit after med spas proves out.
   qualify: {
     minLogoSize: 150,
-    requireOwnerName: true,
+    requireOwnerName: false,
     websiteMustExist: true,
     scoreThreshold: 30,
   },

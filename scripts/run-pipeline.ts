@@ -36,7 +36,7 @@ import { createLlmClient, FixtureLlmClient } from './lib/llm'
 import { makeSlug } from './lib/slug'
 import { updatePipelineState, recordEvent, recordCost } from './lib/metrics'
 import { getSupabaseServer } from '../src/lib/supabase/server'
-import { writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync } from 'fs'
+import { writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync, statSync } from 'fs'
 import type { EnrichedProspect } from './lib/types'
 
 /**
@@ -435,8 +435,6 @@ async function main() {
       // Default gate is true; niche config can set mockupGate: false to override.
       const gateEnabled = nicheConfig.mockupGate !== false
       if (gateEnabled && !isAtOrPast(currentState, 'mockup_review_pending')) {
-        const hasOwner = !!enriched.owner_first_name
-
         // If no email from scraping, generate pattern-based email
         if (!enriched.email && enriched.website) {
           const { enrichEmailViaPattern } = await import('./lib/email-pattern')
@@ -469,14 +467,12 @@ async function main() {
         }
 
         const hasEmail = !!enriched.email && isValidEmail(enriched.email)
-        if (!hasOwner || !hasEmail) {
-          const reason = !hasOwner ? 'no_owner' : 'no_email'
-          console.log(`    [gate] Skipping mockup — ${reason}`)
+        if (!hasEmail) {
+          console.log(`    [gate] Skipping mockup — no_email`)
           if (existingId) {
             await recordEvent(existingId, 'gate:mockup_skipped', {
-              reason,
-              has_owner: hasOwner,
-              has_email: hasEmail,
+              reason: 'no_email',
+              has_email: false,
             })
           }
           stats.mockup_gated++
@@ -607,52 +603,42 @@ async function main() {
   console.log(`  CSV: ${csvPath}`)
 
   // ── Mockup verification tail ──
-  // Confirm every prospect that reached mockup_ready in this run actually has
-  // a renderable image in production. If not, downgrade to qualified and log
-  // mockup_gate_failed. This catches the .gitignore deploy gap + any future
-  // silent storage failures BEFORE outreach is sent.
+  // Verify mockup files exist locally (not against production — files aren't deployed yet).
+  // Production verification runs separately after git push via `npm run verify`.
   if (!dryRun && newlyMockupReady.length > 0 && supabase) {
-    const { verifyOne } = await import('./verify-mockups')
-    console.log(`\n── Verifying ${newlyMockupReady.length} new mockups against production ──`)
+    console.log(`\n── Verifying ${newlyMockupReady.length} new mockups (local file check) ──`)
     const broken: string[] = []
     for (const { id, slug } of newlyMockupReady) {
-      const r = await verifyOne(slug, 'mockup_ready', null)
-      if (r.ok) {
-        console.log(`  ✅ ${slug}`)
+      const localPath = resolve(__dirname, '../public/mockups', `${slug}.webp`)
+      const exists = existsSync(localPath)
+      const size = exists ? statSync(localPath).size : 0
+      const ok = exists && size > 30720  // >30KB — real mockups are 50-200KB
+
+      if (ok) {
+        console.log(`  ✅ ${slug} (${(size / 1024).toFixed(0)} KB)`)
         await supabase.from('prospect_events').insert({
           prospect_id: id,
           event: 'mockup_verified',
-          payload: { url: r.image_url, size: r.image_size, content_type: r.image_content_type },
+          payload: { path: localPath, size, verification: 'local' },
         })
       } else {
-        console.log(`  ❌ ${slug} — ${r.reason}`)
+        console.log(`  ❌ ${slug} — ${!exists ? 'file not found' : `too small (${(size / 1024).toFixed(0)} KB)`}`)
         broken.push(slug)
-        // Downgrade back to qualified
         await supabase.from('prospects').update({ pipeline_state: 'qualified' }).eq('id', id)
         await supabase.from('prospect_events').insert({
           prospect_id: id,
-          event: 'mockup_broken',
-          payload: { url: r.image_url, reason: r.reason, downgraded_to: 'qualified' },
-        })
-        await supabase.from('prospect_events').insert({
-          prospect_id: id,
           event: 'mockup_gate_failed',
-          payload: { reason: 'render_verification_failed', detail: r.reason },
+          payload: { reason: !exists ? 'file_not_found' : 'file_too_small', size, path: localPath },
         })
       }
     }
 
     if (broken.length > 0) {
-      console.log('\n')
-      console.log('╔══════════════════════════════════════════════════════════════════╗')
-      console.log('║ ⚠  MOCKUP VERIFICATION FAILED                                    ║')
-      console.log(`║    ${String(broken.length).padStart(2)} prospect(s) downgraded from mockup_ready → qualified.      ║`)
-      console.log('║    Likely cause: mockup webp not deployed to production.         ║')
-      console.log('║    Fix: git add -f public/mockups/*.webp && git push             ║')
-      console.log('║    Then re-run pipeline to re-advance state.                     ║')
-      console.log('╚══════════════════════════════════════════════════════════════════╝')
-      process.exit(1)
+      console.log(`\n  ⚠ ${broken.length} mockup(s) failed local verification — downgraded to qualified`)
     }
+
+    console.log(`\n  After batch: git add public/mockups/ && git commit -m "feat: new mockups" && git push`)
+    console.log(`  Then run: npm run verify (checks production URLs after deploy)`)
   }
 }
 

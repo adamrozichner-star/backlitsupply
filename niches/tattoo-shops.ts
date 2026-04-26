@@ -21,7 +21,7 @@ const config: NicheConfig = {
   geos: [{ city: 'Nashville', state: 'TN', country: 'US' }],
   qualify: {
     minLogoSize: 120,   // tattoo shops often have smaller, hand-drawn logos
-    requireOwnerName: true,
+    requireOwnerName: false,
     websiteMustExist: true,
     scoreThreshold: 50,
   },

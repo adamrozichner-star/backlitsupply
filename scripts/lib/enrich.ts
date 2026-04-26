@@ -525,11 +525,6 @@ export async function enrichListing(
   const roleStatus = roleValid ? 'VALID' : 'REJECTED'
   console.log(`    [enrich] Role evidence: "${contact.owner_role_evidence || '(none)'}" → ${roleStatus}`)
 
-  if (qualifyConfig.requireOwnerName && !contact.owner_first_name) {
-    console.log(`    [enrich] Skip — owner name required but not found (role gate ${roleValid ? 'passed' : 'failed'})`)
-    return null
-  }
-
   // Parse owner_name from raw listing if available and LLM didn't find one
   let ownerFirst = contact.owner_first_name
   let ownerLast = contact.owner_last_name

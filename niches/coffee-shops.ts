@@ -24,7 +24,7 @@ const config: NicheConfig = {
   geos: [{ city: 'Portland', state: 'OR', country: 'US' }],
   qualify: {
     minLogoSize: 150,
-    requireOwnerName: true,
+    requireOwnerName: false,
     websiteMustExist: true,
     scoreThreshold: 65,
   },

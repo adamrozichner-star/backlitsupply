@@ -25,7 +25,7 @@ const config: NicheConfig = {
   geos: [{ city: 'Miami', state: 'FL', country: 'US' }],
   qualify: {
     minLogoSize: 150,
-    requireOwnerName: true,
+    requireOwnerName: false,
     websiteMustExist: true,
     scoreThreshold: 60,
   },

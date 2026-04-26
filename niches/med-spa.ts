@@ -7,7 +7,7 @@ const config: NicheConfig = {
   geos: [{ city: 'Austin', state: 'TX', county: 'Travis', country: 'US' }],
   qualify: {
     minLogoSize: 150,
-    requireOwnerName: true,
+    requireOwnerName: false,
     websiteMustExist: true,
     scoreThreshold: 40,
   },
