@@ -10,7 +10,10 @@
  *   Tier 3 (confidence 65): {firstname}.{lastname}@ — if full name available
  */
 
-import { promises as dns } from 'dns'
+import { promises as dns, setServers } from 'dns'
+
+// Use public DNS resolvers to avoid ISP/router throttling on bulk queries
+setServers(['1.1.1.1', '8.8.8.8', '8.8.4.4'])
 
 export interface PatternEmailResult {
   found: boolean
@@ -31,15 +34,22 @@ function extractDomain(website: string): string | null {
 }
 
 async function checkMxRecords(domain: string): Promise<boolean> {
-  try {
-    const result = await Promise.race([
-      dns.resolveMx(domain),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('MX timeout')), 5000)),
-    ])
-    return Array.isArray(result) && result.length > 0
-  } catch {
-    return false
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await Promise.race([
+        dns.resolveMx(domain),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('MX timeout')), 5000)),
+      ])
+      return Array.isArray(result) && result.length > 0
+    } catch {
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 2000))
+        continue
+      }
+      return false
+    }
   }
+  return false
 }
 
 function normalize(name: string): string {
@@ -57,6 +67,7 @@ export async function enrichEmailViaPattern(
     return { found: false }
   }
 
+  await new Promise(r => setTimeout(r, 500))
   const hasMx = await checkMxRecords(domain)
   if (!hasMx) {
     console.log(`    [pattern] No MX records for ${domain}`)
