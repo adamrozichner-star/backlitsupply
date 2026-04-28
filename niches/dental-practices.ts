@@ -35,6 +35,7 @@ const config: NicheConfig = {
     'Pacific Dental', 'Dental Works', 'Bright Now', 'Western Dental',
     'Sage Dental', 'Great Expressions', 'Monarch Dental', 'Castle Dental',
     'Jefferson Dental', 'Comfort Dental', 'Gentle Dental', 'MyDentist',
+    'Walden Dental',
   ],
   templates: ['wall-01', 'wall-02', 'wall-05'],
   mockupPrompt: 'A photorealistic close-up of a modern dental clinic reception sign at night. The sign features the provided logo rendered as polished brushed-steel letters with soft warm halo backlighting against a clean white or light-grey clinical wall. Reception area lighting, professional medical aesthetic, calm and trustworthy atmosphere, shallow depth of field. No other text or signage in frame.',
