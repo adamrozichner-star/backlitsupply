@@ -4,7 +4,11 @@ const config: NicheConfig = {
   slug: 'med-spa',
   displayName: 'Med Spas',
   sources: ['google-places', 'comptroller-tx'],
-  geos: [{ city: 'Austin', state: 'TX', county: 'Travis', country: 'US' }],
+  geos: [
+    { city: 'Austin', state: 'TX', county: 'Travis', country: 'US' },
+    { city: 'Miami', state: 'FL', country: 'US' },
+    { city: 'Los Angeles', state: 'CA', country: 'US' },
+  ],
   qualify: {
     minLogoSize: 150,
     requireOwnerName: false,

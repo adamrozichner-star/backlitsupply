@@ -16,7 +16,11 @@ const config: NicheConfig = {
   displayName: 'Dental Practices',
   sources: ['google-places'],
   placesQueries: ['dental practice', 'dentist office'],
-  geos: [{ city: 'Austin', state: 'TX', country: 'US' }],
+  geos: [
+    { city: 'Austin', state: 'TX', country: 'US' },
+    { city: 'Houston', state: 'TX', country: 'US' },
+    { city: 'Denver', state: 'CO', country: 'US' },
+  ],
   qualify: {
     minLogoSize: 150,
     requireOwnerName: false,

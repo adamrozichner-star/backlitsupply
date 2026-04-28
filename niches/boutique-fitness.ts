@@ -22,7 +22,11 @@ const config: NicheConfig = {
     'pilates studio',
     'barre studio',
   ],
-  geos: [{ city: 'Miami', state: 'FL', country: 'US' }],
+  geos: [
+    { city: 'Miami', state: 'FL', country: 'US' },
+    { city: 'Austin', state: 'TX', country: 'US' },
+    { city: 'Brooklyn', state: 'NY', country: 'US' },
+  ],
   qualify: {
     minLogoSize: 150,
     requireOwnerName: false,

@@ -18,7 +18,11 @@ const config: NicheConfig = {
   displayName: 'Tattoo Shops',
   sources: ['google-places'],
   placesQueries: ['tattoo shop', 'tattoo studio', 'tattoo parlor'],
-  geos: [{ city: 'Nashville', state: 'TN', country: 'US' }],
+  geos: [
+    { city: 'Nashville', state: 'TN', country: 'US' },
+    { city: 'Austin', state: 'TX', country: 'US' },
+    { city: 'Brooklyn', state: 'NY', country: 'US' },
+  ],
   qualify: {
     minLogoSize: 120,   // tattoo shops often have smaller, hand-drawn logos
     requireOwnerName: false,
