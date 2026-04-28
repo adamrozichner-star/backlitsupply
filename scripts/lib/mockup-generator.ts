@@ -50,7 +50,7 @@ export class SharpCompositor implements MockupGenerator {
 // ─── Replicate AI generator (single-pass, batch 1 approach) ──
 
 const PRIMARY_MODEL = 'google/gemini-2.5-flash-image'
-const FALLBACK_MODEL = 'black-forest-labs/flux-kontext-pro'
+const PRIMARY_RETRY_DELAYS = [30_000, 60_000]
 
 export class ReplicateGenerator implements MockupGenerator {
   private client: Replicate
@@ -73,16 +73,29 @@ export class ReplicateGenerator implements MockupGenerator {
       console.log(`    [mockup] Using RETRY prompt (retry_count=${retryCount})`)
     }
 
-    let model: string = PRIMARY_MODEL
-    let runResult: { output: unknown; predictionId: string | null }
+    const model = PRIMARY_MODEL
+    let runResult!: { output: unknown; predictionId: string | null }
 
-    try {
-      runResult = await this.runWithRetry(model, prompt, logoDataUri)
-    } catch (err) {
-      const msg = (err as Error).message || ''
-      console.warn(`[mockup] Primary model failed: ${msg}. Trying fallback...`)
-      model = FALLBACK_MODEL
-      runResult = await this.runWithRetry(model, prompt, logoDataUri)
+    // Retry primary model with increasing backoff — no fallback model
+    let lastErr: Error | null = null
+    for (let attempt = 0; attempt < 1 + PRIMARY_RETRY_DELAYS.length; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = PRIMARY_RETRY_DELAYS[attempt - 1]
+          console.log(`    [mockup] Primary failed, retry ${attempt}/${PRIMARY_RETRY_DELAYS.length} in ${delay / 1000}s...`)
+          await new Promise(r => setTimeout(r, delay))
+        }
+        runResult = await this.runWithRetry(model, prompt, logoDataUri)
+        lastErr = null
+        break
+      } catch (err) {
+        lastErr = err as Error
+        console.warn(`    [mockup] Attempt ${attempt + 1} failed: ${lastErr.message?.slice(0, 100)}`)
+      }
+    }
+
+    if (lastErr) {
+      throw new Error(`[mockup] All ${1 + PRIMARY_RETRY_DELAYS.length} attempts failed for ${slug}: ${lastErr.message?.slice(0, 100)}`)
     }
 
     const imageUrl = this.extractUrl(runResult.output)
@@ -100,7 +113,7 @@ export class ReplicateGenerator implements MockupGenerator {
       .toBuffer()
 
     // Fetch actual cost from the prediction (Replicate bills per-prediction)
-    let cost_usd = model === PRIMARY_MODEL ? 0.039 : 0.04  // estimate fallback
+    let cost_usd = 0.039
     const prediction_id = runResult.predictionId
     if (prediction_id) {
       try {
@@ -145,14 +158,10 @@ export class ReplicateGenerator implements MockupGenerator {
   }
 
   private async runModel(model: string, prompt: string, imageDataUri: string): Promise<{ output: unknown; predictionId: string | null }> {
-    const modelId = model === PRIMARY_MODEL ? PRIMARY_MODEL : FALLBACK_MODEL
-    const input = model === PRIMARY_MODEL
-      ? { prompt, image_input: [imageDataUri], aspect_ratio: '16:9', output_format: 'jpg' }
-      : { prompt, image_url: imageDataUri, aspect_ratio: '16:9' }
+    const input = { prompt, image_input: [imageDataUri], aspect_ratio: '16:9', output_format: 'jpg' }
 
-    // Use predictions.create + wait to get the prediction ID for cost tracking
     const prediction = await this.client.predictions.create({
-      model: modelId as `${string}/${string}`,
+      model: model as `${string}/${string}`,
       input,
     })
 
