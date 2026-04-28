@@ -359,8 +359,12 @@ async function main() {
             owner_last_name: enriched.owner_last_name || null,
             email: enriched.email || null,
             logo_url: enriched.logo_url || null,
+            logo_width: enriched.logo_width || null,
+            logo_height: enriched.logo_height || null,
             logo_extraction_trace: enriched.logo_extraction_trace || null,
             website: enriched.website || null,
+            rating: enriched.rating || null,
+            review_count: enriched.review_count || null,
             enrichment_version: CURRENT_ENRICHMENT_VERSION,
           }).eq('id', existingId)
 
@@ -387,8 +391,10 @@ async function main() {
               state: row.state,
               county: undefined,
               logo_url: row.logo_url,
-              logo_width: undefined,
-              logo_height: undefined,
+              logo_width: row.logo_width ?? undefined,
+              logo_height: row.logo_height ?? undefined,
+              rating: row.rating ?? undefined,
+              review_count: row.review_count ?? undefined,
               source_slug: row.source || 'unknown',
               source_id: undefined,
             }
@@ -437,8 +443,8 @@ async function main() {
       // Default gate is true; niche config can set mockupGate: false to override.
       const gateEnabled = nicheConfig.mockupGate !== false
       if (gateEnabled && !isAtOrPast(currentState, 'mockup_review_pending')) {
-        // If no email from scraping, generate pattern-based email
-        if (!enriched.email && enriched.website) {
+        // If no valid email, generate pattern-based email
+        if ((!enriched.email || !isValidEmail(enriched.email)) && enriched.website) {
           const { enrichEmailViaPattern } = await import('./lib/email-pattern')
           const patternResult = await enrichEmailViaPattern(
             enriched.website,

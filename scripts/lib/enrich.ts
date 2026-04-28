@@ -24,7 +24,7 @@ import type { QualifyConfig } from '../../niches/types'
  *   v4 = inverted logo extraction priority (logo-class → header/nav → favicon →
  *        apple-touch → og:image LAST), dimension/aspect-ratio/content-type filtering
  */
-export const CURRENT_ENRICHMENT_VERSION = 4
+export const CURRENT_ENRICHMENT_VERSION = 5
 
 // ─── Logo discovery (v4: inverted priority, dimension + format filtering) ────
 
