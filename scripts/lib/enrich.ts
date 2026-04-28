@@ -192,6 +192,94 @@ async function validateLogo(
   }
 }
 
+// ─── Logo verification via Haiku vision ────────────────
+
+const LOGO_VERIFY_TOOL = {
+  name: 'verify_logo',
+  description: 'Verify whether an image is a brand logo for a specific business.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      is_logo: { type: 'boolean', description: 'True if the image is a brand logo for this business' },
+      confidence: { type: 'number', description: '0-100 confidence score' },
+      reason: { type: 'string', description: 'Brief explanation' },
+    },
+    required: ['is_logo', 'confidence', 'reason'],
+  },
+}
+
+async function verifyLogoWithHaiku(
+  logoUrl: string,
+  businessName: string,
+  llm: LlmClient,
+): Promise<{ is_logo: boolean; confidence: number; reason: string }> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    let logoRes: Response
+    try {
+      logoRes = await fetch(logoUrl, { signal: controller.signal })
+    } catch { clearTimeout(timeout); return { is_logo: true, confidence: 50, reason: 'fetch failed, allowing' } }
+
+    if (!logoRes.ok) { clearTimeout(timeout); return { is_logo: true, confidence: 50, reason: 'fetch non-200, allowing' } }
+
+    const buf = Buffer.from(await logoRes.arrayBuffer())
+    clearTimeout(timeout)
+
+    const contentType = logoRes.headers.get('content-type')?.split(';')[0] || 'image/png'
+    let imgBuf: Buffer = buf
+
+    // Rasterize SVGs for Haiku vision
+    if (contentType.includes('svg')) {
+      const sharpMod = (await import('sharp')).default
+      imgBuf = Buffer.from(await sharpMod(buf).resize(400, 400, { fit: 'inside' }).png().toBuffer())
+    }
+
+    const b64 = imgBuf.toString('base64')
+    const mime = contentType.includes('svg') ? 'image/png' : contentType
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) return { is_logo: true, confidence: 50, reason: 'no API key, allowing' }
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 256,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
+            { type: 'text', text: `Is this image a brand logo for "${businessName}"?\n\nA valid logo contains the business name as text OR a distinctive brand mark, and is graphic/vector style (not a photograph).\n\nINVALID: social media badges (Instagram, Facebook), payment widgets (Afterpay, Klarna), photos of people/buildings, stock graphics, single letters with no context, marketing badges ("BEFORE & AFTER", "SALE").` },
+          ],
+        }],
+        tools: [LOGO_VERIFY_TOOL],
+        tool_choice: { type: 'tool', name: 'verify_logo' },
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+
+    if (!res.ok) return { is_logo: true, confidence: 50, reason: 'Haiku API error, allowing' }
+
+    const data = await res.json()
+    const toolUse = data.content?.find((b: { type: string }) => b.type === 'tool_use')
+    if (!toolUse) return { is_logo: true, confidence: 50, reason: 'no tool response, allowing' }
+
+    return {
+      is_logo: toolUse.input.is_logo ?? true,
+      confidence: toolUse.input.confidence ?? 50,
+      reason: toolUse.input.reason ?? 'unknown',
+    }
+  } catch (err) {
+    return { is_logo: true, confidence: 50, reason: `error: ${(err as Error).message?.slice(0, 50)}` }
+  }
+}
+
 // ─── Owner/email extraction via LLM ────────────────────
 
 const CONTACT_EXTRACT_TOOL = {
@@ -540,6 +628,36 @@ export async function enrichListing(
     return null
   }
   console.log(`    [enrich] Logo found: ${logoTrace.winner!.tierName} ${logo.url.slice(0, 60)}... (${logo.width}x${logo.height}, fmt:${logoTrace.winner!.formatScore})`)
+
+  // Verify logo with Haiku vision — reject social icons, payment widgets, photos
+  const logoVerified = await verifyLogoWithHaiku(logo.url, listing.business_name, llm)
+  if (!logoVerified.is_logo || logoVerified.confidence < 70) {
+    console.log(`    [enrich] Logo rejected by Haiku: ${logoVerified.reason} (confidence: ${logoVerified.confidence})`)
+
+    // Try remaining candidates
+    let fallbackFound = false
+    for (const candidate of logoCandidates) {
+      if (candidate.url === logo.url) continue
+      const traceEntry = logoTrace.candidates.find(c => c.url === candidate.url)
+      if (traceEntry?.rejected) continue
+
+      const fallbackVerify = await verifyLogoWithHaiku(candidate.url, listing.business_name, llm)
+      if (fallbackVerify.is_logo && fallbackVerify.confidence >= 70) {
+        console.log(`    [enrich] Fallback logo accepted: ${candidate.url.slice(0, 60)}... (confidence: ${fallbackVerify.confidence})`)
+        logo = { url: candidate.url, width: traceEntry?.width || 500, height: traceEntry?.height || 500 }
+        fallbackFound = true
+        break
+      }
+      console.log(`    [enrich] Fallback candidate rejected: ${fallbackVerify.reason}`)
+    }
+
+    if (!fallbackFound) {
+      console.log(`    [enrich] Skip — all logo candidates failed Haiku verification`)
+      return null
+    }
+  } else {
+    console.log(`    [enrich] Logo verified by Haiku (confidence: ${logoVerified.confidence})`)
+  }
 
   // Extract owner + email via LLM (multi-page crawl)
   console.log(`    [enrich] Crawling for owner/email (homepage + subpages)...`)
