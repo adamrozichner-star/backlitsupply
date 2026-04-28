@@ -19,6 +19,15 @@ import { config } from 'dotenv'
 import { resolve } from 'path'
 config({ path: resolve(__dirname, '../.env.local') })
 
+// Catch async AbortErrors and other unhandled rejections that escape try/catch
+// (Node undici throws from process.nextTick on fetch abort — uncatchable in sync flow)
+process.on('uncaughtException', (err) => {
+  console.error(`[fatal] Uncaught exception: ${err.message?.slice(0, 150)}`)
+})
+process.on('unhandledRejection', (err) => {
+  console.error(`[fatal] Unhandled rejection: ${err instanceof Error ? err.message?.slice(0, 150) : String(err)}`)
+})
+
 import { getNiche } from '../niches'
 import { getSource } from './lib/sources'
 import './lib/sources/comptroller-tx'

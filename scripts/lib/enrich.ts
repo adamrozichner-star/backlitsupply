@@ -137,22 +137,33 @@ async function validateLogo(
   minSize: number,
 ): Promise<{ url: string; width: number; height: number; formatScore: number; rejected?: string } | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
-    if (!res.ok) return { url, width: 0, height: 0, formatScore: 0, rejected: `http-${res.status}` }
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    let res: Response
+    try {
+      res = await fetch(url, { signal: controller.signal })
+    } catch (fetchErr) {
+      clearTimeout(timeout)
+      throw fetchErr
+    }
+    if (!res.ok) { clearTimeout(timeout); return { url, width: 0, height: 0, formatScore: 0, rejected: `http-${res.status}` } }
 
     const contentType = res.headers.get('content-type')?.split(';')[0] || ''
     const fmtScore = FORMAT_SCORE[contentType] || 0
 
     if (!contentType.startsWith('image/')) {
+      clearTimeout(timeout)
       return { url, width: 0, height: 0, formatScore: 0, rejected: `bad-content-type: ${contentType}` }
     }
 
     // SVGs are always valid logos
     if (contentType === 'image/svg+xml') {
+      clearTimeout(timeout)
       return { url, width: 500, height: 500, formatScore: 10 }
     }
 
     const buffer = Buffer.from(await res.arrayBuffer())
+    clearTimeout(timeout)
     const sharpMod = (await import('sharp')).default
     const meta = await sharpMod(buffer).metadata()
     if (!meta.width || !meta.height) {
@@ -339,16 +350,20 @@ function findOwnerPageLinks(html: string, baseUrl: string): { url: string; prior
 }
 
 async function fetchPageText(url: string, timeoutMs: number): Promise<{ text: string; size: number } | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
-    if (!res.ok) return null
+    const res = await fetch(url, { signal: controller.signal })
+    if (!res.ok) { clearTimeout(timeout); return null }
     const html = await res.text()
+    clearTimeout(timeout)
     const $ = cheerio.load(html)
     // Remove script/style noise
     $('script, style, nav, footer, header').remove()
     const text = $('body').text().replace(/\s+/g, ' ').trim()
     return { text, size: html.length }
   } catch {
+    clearTimeout(timeout)
     return null
   }
 }
@@ -465,12 +480,21 @@ export async function enrichListing(
   console.log(`    [enrich] Fetching ${listing.website} ...`)
   let html: string
   try {
-    const res = await fetch(listing.website, { signal: AbortSignal.timeout(15000) })
-    if (!res.ok) {
-      console.log(`    [enrich] Skip — website returned ${res.status}`)
-      return null
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    try {
+      const res = await fetch(listing.website, { signal: controller.signal })
+      if (!res.ok) {
+        clearTimeout(timeout)
+        console.log(`    [enrich] Skip — website returned ${res.status}`)
+        return null
+      }
+      html = await res.text()
+      clearTimeout(timeout)
+    } catch (fetchErr) {
+      clearTimeout(timeout)
+      throw fetchErr
     }
-    html = await res.text()
     console.log(`    [enrich] HTML received: ${(html.length / 1024).toFixed(0)}KB`)
   } catch (err) {
     console.log(`    [enrich] Skip — website fetch failed: ${(err as Error).message?.slice(0, 80)}`)
