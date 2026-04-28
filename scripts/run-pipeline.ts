@@ -511,6 +511,27 @@ async function main() {
             continue
           }
           logoBuffer = Buffer.from(await logoRes.arrayBuffer())
+
+          // Rasterize SVGs to PNG (Replicate expects raster image, not XML)
+          const contentType = logoRes.headers.get('content-type') || ''
+          const isSvg = contentType.includes('svg') || enriched.logo_url!.endsWith('.svg')
+          if (isSvg) {
+            console.log(`    [mockup] SVG detected — rasterizing to PNG`)
+            const sharpMod = (await import('sharp')).default
+            logoBuffer = await sharpMod(logoBuffer)
+              .resize(800, 800, { fit: 'inside', withoutEnlargement: false })
+              .png()
+              .toBuffer()
+          }
+
+          // Log dimensions for debugging
+          try {
+            const sharpMod = (await import('sharp')).default
+            const meta = await sharpMod(logoBuffer).metadata()
+            console.log(`    [mockup] Sending to Replicate: ${meta.format} ${meta.width}x${meta.height}`)
+          } catch {
+            console.log(`    [mockup] Sending to Replicate: unknown format`)
+          }
         }
 
         const mockupOutputPath = resolve(mockupDir, `${slug}.webp`)

@@ -62,7 +62,11 @@ export class ReplicateGenerator implements MockupGenerator {
   }
 
   async generate(logo: Buffer, niche: NicheConfig, slug: string, retryCount: number = 0) {
-    const logoDataUri = `data:image/png;base64,${logo.toString('base64')}`
+    // Detect format from buffer magic bytes
+    const isWebp = logo[0] === 0x52 && logo[1] === 0x49  // RIFF
+    const isJpeg = logo[0] === 0xFF && logo[1] === 0xD8
+    const mime = isWebp ? 'image/webp' : isJpeg ? 'image/jpeg' : 'image/png'
+    const logoDataUri = `data:${mime};base64,${logo.toString('base64')}`
 
     // Select prompt: use retry variant if retryCount > 0 and niche has one
     const useRetry = retryCount > 0 && !!niche.mockupPromptRetry
