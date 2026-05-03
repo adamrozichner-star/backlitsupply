@@ -54,7 +54,7 @@ async function main() {
   // Fetch mockup_ready prospects not yet pushed
   const { data: prospects } = await sb
     .from('prospects')
-    .select('id, slug, email, owner_first_name, owner_last_name, business_name, website, phone, mockup_url, email_confidence, email_is_role_based, created_at')
+    .select('id, slug, email, owner_first_name, owner_last_name, business_name, website, phone, mockup_url, mockup_image_url, email_confidence, email_is_role_based, created_at')
     .eq('pipeline_state', 'mockup_ready')
     .is('instantly_lead_id', null)
     .not('email', 'is', null)

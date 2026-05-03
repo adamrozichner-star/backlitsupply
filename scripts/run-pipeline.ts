@@ -566,8 +566,10 @@ async function main() {
 
         // Update DB with mockup URL + transition state
         if (supabase && existingId) {
+          const mockupImageUrl = `https://backlitsupply.com${mockupUrl}`
           await supabase.from('prospects').update({
             mockup_url: mockupUrl,
+            mockup_image_url: mockupImageUrl,
             suggested_dimensions: nicheConfig.priceRange[0] <= 600 ? '24" wide' : '28" wide',
             suggested_price_usd: nicheConfig.priceRange[0],
           }).eq('id', existingId)

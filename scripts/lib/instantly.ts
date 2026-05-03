@@ -13,7 +13,8 @@
  * Merge tag mapping (Instantly template syntax):
  *   {{firstName}}  ← prospect.owner_first_name
  *   {{companyName}} ← prospect.business_name
- *   {{mockupUrl}}  ← custom_variables.mockupUrl
+ *   {{mockupUrl}}  ← custom_variables.mockupUrl (landing page URL)
+ *   {{mockupImageUrl}} ← custom_variables.mockupImageUrl (direct image URL for <img>)
  *   {{personalizedPageUrl}} ← custom_variables.personalizedPageUrl
  */
 
@@ -175,12 +176,18 @@ export interface ProspectForInstantly {
   phone?: string | null
   slug?: string | null
   mockup_url?: string | null
+  mockup_image_url?: string | null
 }
 
 export function prospectToLead(prospect: ProspectForInstantly): InstantlyLeadInput {
   const personalizedPageUrl = prospect.slug
     ? `https://backlitsupply.com/for/${prospect.slug}`
     : null
+
+  // mockup_image_url = direct image URL for inline email rendering
+  // mockupUrl = personalized landing page URL (clickable link)
+  const mockupImageUrl = prospect.mockup_image_url
+    || (prospect.mockup_url ? `https://backlitsupply.com${prospect.mockup_url}` : '')
 
   return {
     email: prospect.email,
@@ -191,6 +198,7 @@ export function prospectToLead(prospect: ProspectForInstantly): InstantlyLeadInp
     phone: prospect.phone || undefined,
     custom_variables: {
       mockupUrl: personalizedPageUrl || '',
+      mockupImageUrl,
       personalizedPageUrl: personalizedPageUrl || '',
       businessName: prospect.business_name || '',
     },
